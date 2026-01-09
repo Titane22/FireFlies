@@ -24,3 +24,10 @@ void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputC
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &AFFCharacter::ShootFire);*/
 	}
 }
+
+void APlayer_Base::BeginPlay()
+{
+	Super::BeginPlay();
+
+	FlashlightChild->SetVisibility(false);
+}

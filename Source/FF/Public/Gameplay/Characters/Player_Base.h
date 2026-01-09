@@ -41,6 +41,8 @@ public:
 	
 protected:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	 
+	virtual void BeginPlay();
 	
 public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Camera")

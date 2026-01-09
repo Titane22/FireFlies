@@ -7,6 +7,10 @@
 #include "Gameplay/Data/ItemData.h"
 #include "FFCharacter.generated.h"
 
+class UHurtbox;
+class UHealthSystem;
+class UInventorySystem;
+class UEquipmentSystem;
 class UPhysicalAnimationComponent;
 struct FInputActionValue;
 
@@ -20,10 +24,14 @@ public:
 	AFFCharacter();
 	
 	UPhysicalAnimationComponent* GetPAC() const { return PAC; }
+
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	virtual void FlashOnOff();
+
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
 	TMap<EEquipmentSlot, UChildActorComponent*> EquippedChilds;
-	
+
 	// Weapon Child Actor Components
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon", meta = (AllowPrivateAccess = "true"))
 	UChildActorComponent* PrimaryChild;
@@ -36,5 +44,23 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	USceneComponent* Primary;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	USceneComponent* Handgun;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UPhysicalAnimationComponent* PAC;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UEquipmentSystem* EquipmentSystem;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UInventorySystem* InventorySystem;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UHealthSystem* HealthComponent;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UHurtbox* Hurtbox;
 };

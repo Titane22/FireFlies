@@ -9,7 +9,7 @@
 AFlashlight::AFlashlight()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("FlashLightArm"));
 	RootComponent = SpringArm;
@@ -36,6 +36,10 @@ void AFlashlight::BeginPlay()
 	SpotLight->bUseInverseSquaredFalloff = true;
 	SpotLight->OuterConeAngle = 35.f;
 	SpotLight->InnerConeAngle = 15.f;
+
+	// Owner의 그림자만 무시
+	SpotLight->bCastShadowsFromCinematicObjectsOnly = false;
+	SpotLight->bAffectTranslucentLighting = true;
 }
 
 // Called every frame
