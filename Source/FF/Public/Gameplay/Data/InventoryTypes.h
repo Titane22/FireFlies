@@ -1,0 +1,224 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Gameplay/Data/ItemData.h"
+#include "InventoryTypes.generated.h"
+
+/**
+ * Represents a single item slot in the inventory
+ * Holds reference to ItemData and instance-specific properties
+ */
+USTRUCT(BlueprintType)
+struct FItemSlot
+{
+	GENERATED_BODY()
+
+	//==============================================================================
+	// Item Reference
+	//==============================================================================
+
+	/** Reference to the item data asset (WeaponData, ConsumableData, etc.) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
+	TSoftObjectPtr<UItemData> ItemData;
+
+	//==============================================================================
+	// Instance Properties
+	//==============================================================================
+
+	/** Grid position - Top-left row (-1 means not placed in grid) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item|Grid")
+	int32 GridRow = -1;
+
+	/** Grid position - Top-left column (-1 means not placed in grid) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item|Grid")
+	int32 GridCol = -1;
+
+	/** Number of items in this stack (must respect ItemData->MaxStackSize) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item", meta = (ClampMin = "0"))
+	int32 Quantity = 1;
+
+	/** Unique instance ID for this specific item (useful for trading, upgrading, etc.) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
+	FGuid InstanceId;
+
+	/** Optional durability for degradable items (0.0 = broken, 1.0 = pristine) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float Durability = 1.0f;
+
+	//==============================================================================
+	// Constructor & Operators
+	//==============================================================================
+
+	FItemSlot()
+		: ItemData(nullptr)
+		, GridRow(-1)
+		, GridCol(-1)
+		, Quantity(1)
+		, InstanceId(FGuid::NewGuid())
+		, Durability(1.0f)
+	{}
+
+	FItemSlot(TSoftObjectPtr<UItemData> InItemData, int32 InQuantity = 1)
+		: ItemData(InItemData)
+		, GridRow(-1)
+		, GridCol(-1)
+		, Quantity(InQuantity)
+		, InstanceId(FGuid::NewGuid())
+		, Durability(1.0f)
+	{}
+
+	bool operator==(const FItemSlot& Other) const
+	{
+		return InstanceId == Other.InstanceId;
+	}
+
+	bool operator!=(const FItemSlot& Other) const
+	{
+		return !(*this == Other);
+	}
+
+	//==============================================================================
+	// Helper Functions
+	//==============================================================================
+
+	/** Check if this slot is valid (has valid ItemData) */
+	bool IsValid() const
+	{
+		return !ItemData.IsNull();
+	}
+
+	/** Check if this slot is empty */
+	bool IsEmpty() const
+	{
+		return ItemData.IsNull() || Quantity <= 0;
+	}
+
+	/** Get the loaded ItemData (loads if not already loaded) */
+	UItemData* GetItemData() const
+	{
+		return ItemData.LoadSynchronous();
+	}
+
+	/** Get total weight of items in this slot */
+	float GetTotalWeight() const
+	{
+		if (UItemData* Data = GetItemData())
+		{
+			return Data->GetTotalWeight(Quantity);
+		}
+		return 0.0f;
+	}
+
+	/** Check if this slot can stack with another slot */
+	bool CanStackWith(const FItemSlot& Other) const
+	{
+		if (ItemData != Other.ItemData || ItemData.IsNull())
+		{
+			return false;
+		}
+
+		UItemData* Data = GetItemData();
+		if (!Data || !Data->bStackable)
+		{
+			return false;
+		}
+
+		// Can stack if same item and total quantity doesn't exceed max stack size
+		return (Quantity + Other.Quantity) <= Data->MaxStackSize;
+	}
+
+	/** Add quantity to this slot (returns overflow amount if exceeds max stack) */
+	int32 AddQuantity(int32 Amount)
+	{
+		if (Amount <= 0 || ItemData.IsNull())
+		{
+			return Amount;
+		}
+
+		UItemData* Data = GetItemData();
+		if (!Data)
+		{
+			return Amount;
+		}
+
+		int32 MaxAdd = Data->bStackable ? (Data->MaxStackSize - Quantity) : 0;
+		int32 ActualAdd = FMath::Min(Amount, MaxAdd);
+
+		Quantity += ActualAdd;
+		return Amount - ActualAdd; // Return overflow
+	}
+
+	/** Remove quantity from this slot (returns actual amount removed) */
+	int32 RemoveQuantity(int32 Amount)
+	{
+		int32 ActualRemove = FMath::Min(Amount, Quantity);
+		Quantity -= ActualRemove;
+		return ActualRemove;
+	}
+
+	/** Clear this slot */
+	void Clear()
+	{
+		ItemData = nullptr;
+		GridRow = -1;
+		GridCol = -1;
+		Quantity = 0;
+		Durability = 1.0f;
+	}
+
+	//==============================================================================
+	// Grid Helper Functions
+	//==============================================================================
+
+	/** Check if this item is placed in the grid */
+	bool IsPlacedInGrid() const
+	{
+		return GridRow >= 0 && GridCol >= 0;
+	}
+
+	/** Check if this item occupies a specific grid cell */
+	bool OccupiesCell(int32 Row, int32 Col) const
+	{
+		if (!IsPlacedInGrid())
+		{
+			return false;
+		}
+
+		UItemData* Data = GetItemData();
+		if (!Data)
+		{
+			return false;
+		}
+
+		// Check if (Row, Col) is within the item's bounding box
+		return Row >= GridRow && Row < (GridRow + Data->GridHeight) &&
+		       Col >= GridCol && Col < (GridCol + Data->GridWidth);
+	}
+
+	/** Get all grid cells occupied by this item */
+	TArray<FIntPoint> GetOccupiedCells() const
+	{
+		TArray<FIntPoint> Cells;
+
+		if (!IsPlacedInGrid())
+		{
+			return Cells;
+		}
+
+		UItemData* Data = GetItemData();
+		if (!Data)
+		{
+			return Cells;
+		}
+
+		for (int32 Row = GridRow; Row < GridRow + Data->GridHeight; ++Row)
+		{
+			for (int32 Col = GridCol; Col < GridCol + Data->GridWidth; ++Col)
+			{
+				Cells.Add(FIntPoint(Col, Row));
+			}
+		}
+
+		return Cells;
+	}
+};

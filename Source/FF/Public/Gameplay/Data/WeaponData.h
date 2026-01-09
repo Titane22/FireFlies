@@ -3,10 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/DataAsset.h"
+#include "Gameplay/Data/ItemData.h"
 #include "WeaponData.generated.h"
 
-class AWeapon_Base;
+class UNiagaraSystem;
+class AMasterWeapon;
+class UW_DynamicWeaponHUD;
 
 UENUM(BlueprintType)
 enum class EWeaponType : uint8
@@ -22,25 +24,21 @@ enum class EFireMode : uint8
 	FullAuto    UMETA(DisplayName = "FullAuto"),
 	Burst       UMETA(DisplayName = "Burst")
 };
+
 /**
- * 
+ * Weapon-specific data that extends the base ItemData
  */
 UCLASS()
-class FF_API UWeaponData : public UPrimaryDataAsset
+class FF_API UWeaponData : public UItemData
 {
 	GENERATED_BODY()
+
 public:
 	UWeaponData();
 
 	// Weapon Details
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Details")
-	FString WeaponName;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Details")
 	EWeaponType WeaponType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Details")
-	TSubclassOf<AWeapon_Base> WeaponClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fire Mode Data")
 	EFireMode FireMode;
@@ -65,10 +63,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
 	UTexture2D* WeaponUITexture;
 
-	// UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
-	// TSubclassOf<UW_DynamicWeaponHUD> WeaponUI;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UW_DynamicWeaponHUD> WeaponUI;
 
-	// Animation
+	// Animation	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	FVector LeftHandIKOffset;
 
@@ -84,7 +82,53 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	UAnimMontage* WeaponReloadMontage;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+	UAnimMontage* WeaponEquipMontage;
 	// Audio
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio")
 	USoundBase* FireSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio")
+	USoundBase* HitMarkerSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio")
+	USoundBase* KillSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio")
+	USoundBase* EmptySound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio")
+	USoundAttenuation* SoundAttenuation;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio")
+	USoundConcurrency* SoundConcurrency;
+
+	// VFX
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "VFX")
+	UNiagaraSystem* MuzzleFlashVFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "VFX")
+	TSubclassOf<AActor> BulletTraceClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "VFX")
+	TSubclassOf<UUserWidget> HitMarkerUI;
+
+	// Ammo Data
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
+	int32 CurrentAmmo = 30;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
+	int32 MaxAmmo = 90;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
+	int32 ClipAmmo = 30;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
+	int32 DifferentAmmo = 90;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
+	int32 AmmoCount = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
+	bool bShortGunTrace = false;
 };

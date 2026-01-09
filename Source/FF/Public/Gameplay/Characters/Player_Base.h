@@ -34,6 +34,18 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SwitchHandgunAction;
+	
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
+	class UW_DynamicWeaponHUD* CurrentWeaponUI;
+	
 protected:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	
+public:
+	UFUNCTION(BlueprintImplementableEvent, Category = "Camera")
+	class UCameraComponent* GetFollowCamera() const;
+	
+	UFUNCTION(BlueprintImplementableEvent, Category = "Camera")
+	class USpringArmComponent* GetCameraBoom() const;
 };

@@ -4,15 +4,20 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "Gameplay/Library/AnimationState.h"
 #include "NiagaraSystem.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "WeaponSystem.generated.h"
 
-class UWeaponData;
+#define COLLISION_BULLET ECollisionChannel::ECC_GameTraceChannel1
+
 class AFFCharacter;
-class AWeapon_Base;
+class USkeletalMesh;
+class AMasterWeapon;
+class UWeaponData;
+class UUserWidget;
+class UNiagaraSystem;
+class USceneComponent;
 
 USTRUCT(BlueprintType)
 struct FWeapon_Data
@@ -54,20 +59,6 @@ struct FWeapon_Details
 	};
 };
 
-UENUM(BlueprintType)
-enum class EWeaponSlot : uint8
-{
-	Primary     UMETA(DisplayName = "Primary"),
-	Handgun     UMETA(DisplayName = "Handgun")
-};
-
-UENUM(BlueprintType)
-enum class EWeaponState : uint8
-{
-	Equip       UMETA(DisplayName = "Equip"),
-	Unequip     UMETA(DisplayName = "Unequip")
-};
-
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class FF_API UWeaponSystem : public UActorComponent
 {
@@ -76,15 +67,6 @@ class FF_API UWeaponSystem : public UActorComponent
 public:	
 	// Sets default values for this component's properties
 	UWeaponSystem();
-
-	UFUNCTION()
-	void SetWeaponState(TSubclassOf<AWeapon_Base> ToSetWeaponClass, EAnimationState ToSetAnimation, EWeaponState CurWeaponState, FName ToSetEquipSocketName, FName ToSetUnequipSocketName, EWeaponSlot WeaponSlot = EWeaponSlot::Primary);
-
-	UFUNCTION()
-	void EquipWeapon(FName SocketName, EWeaponSlot WeaponSlot);
-
-	UFUNCTION()
-	void UnequipWeapon(FName SocketName, EWeaponSlot WeaponSlot);
 
 	bool FireCheck(int32 AmmoCount);
 
@@ -101,26 +83,13 @@ public:
 	float ReloadMontage(UAnimMontage* ReloadAnim);
 
 	void ReloadCheck();
-	
-protected:
-	// Called when the game starts
-	virtual void BeginPlay() override;
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	USkeletalMesh* WeaponMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	TSubclassOf<AWeapon_Base> MasterWeapon;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Animation")
-	EAnimationState AnimationState;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	bool bIsDryAmmo;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	UUserWidget* CrosshairWidget;
 
 	UPROPERTY()
 	FWeapon_Details Weapon_Details = {
@@ -134,11 +103,6 @@ public:
 		}
 	};
 
+	UPROPERTY()
 	AFFCharacter* CharacterRef;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	UWeaponData* RifleData;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	UWeaponData* PistolData;
 };

@@ -19,8 +19,8 @@ void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputC
 
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		EnhancedInputComponent->BindAction(SwitchWeaponsAction, ETriggerEvent::Triggered, this, &AFFCharacter::SwitchWeapons);
+		/*EnhancedInputComponent->BindAction(SwitchWeaponsAction, ETriggerEvent::Triggered, this, &AFFCharacter::SwitchWeapons);
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &AFFCharacter::Reload);
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &AFFCharacter::ShootFire);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &AFFCharacter::ShootFire);*/
 	}
 }
