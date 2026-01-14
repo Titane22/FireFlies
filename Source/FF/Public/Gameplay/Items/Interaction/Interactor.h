@@ -67,9 +67,9 @@ protected:
 	// State
 	//==============================================================================
 
-	/** 현재 감지된 상호작용 대상 */
+	/** 현재 감지된 상호작용 대상 (IInteractable 인터페이스 구현 액터) */
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction|State")
-	TWeakObjectPtr<AInteraction> CurrentInteraction;
+	TWeakObjectPtr<AActor> CurrentInteractionActor;
 
 	/** 상호작용 진행 중 여부 (Hold 타입용) */
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction|State")
@@ -108,11 +108,8 @@ private:
 	/** 트레이스 시작/끝 위치 계산 */
 	bool GetTraceStartEnd(FVector& OutStart, FVector& OutEnd) const;
 
-	/** 현재 상호작용 하이라이트 중지 */
-	void StopCurrentInteraction();
-
 	/** 새로운 상호작용 감지 시작 */
-	void StartNewInteraction(AInteraction* NewInteraction);
+	void StartNewInteraction(AActor* NewInteractionActor);
 
 public:
 	//==============================================================================
@@ -137,15 +134,17 @@ public:
 	 */
 	void ExecuteCurrentInteraction();
 
+	/** 현재 상호작용 하이라이트 중지 */
+	void StopCurrentInteraction();
 	//==============================================================================
 	// Getters
 	//==============================================================================
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
-	bool HasActiveInteraction() const { return CurrentInteraction.IsValid(); }
+	bool HasActiveInteraction() const { return CurrentInteractionActor.IsValid(); }
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
-	AInteraction* GetCurrentInteraction() const { return CurrentInteraction.Get(); }
+	AActor* GetCurrentInteractionActor() const { return CurrentInteractionActor.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	UInteractionData* GetCurrentInteractionData() const;
@@ -158,6 +157,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	float GetHoldProgress() const;
+
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	FText GetCurrentInteractionPrompt() const;
 
 	//==============================================================================
 	// Setters

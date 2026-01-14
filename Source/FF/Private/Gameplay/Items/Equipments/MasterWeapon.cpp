@@ -4,9 +4,12 @@
 #include "Gameplay/Items/Equipments/WeaponSystem.h"
 #include "Gameplay/Characters/FFCharacter.h"
 #include "Gameplay/Characters/Player_Base.h"
+#include "Gameplay/Items/EquipmentSystem.h"
 //#include "Gameplay/Items/Equipments/WeaponFireCameraShake.h"
 #include "Gameplay/Data/WeaponData.h"
+#include "Gameplay/Data/InteractionData.h"
 #include "Gameplay/Characters/FFCharacter.h"
+#include "Gameplay/Items/InventorySystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
@@ -24,18 +27,20 @@ AMasterWeapon::AMasterWeapon()
 	PrimaryActorTick.bCanEverTick = true;
 
     // Create Components
-    DefaultSceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("DefaultSceneRoot"));
     WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
+    InteractCollision = CreateDefaultSubobject<USphereComponent>(TEXT("InteractCollision"));
     WeaponSystem = CreateDefaultSubobject<UWeaponSystem>(TEXT("WeaponSystem"));
 
     // Setting up the component hierarchy
-    RootComponent = DefaultSceneRoot;
-    WeaponMesh->SetupAttachment(DefaultSceneRoot);
+    RootComponent = WeaponMesh;
+    InteractCollision->SetupAttachment(WeaponMesh);
+
+    // Set InteractBox collision preset to Interactable
+    InteractCollision->SetCollisionProfileName(FName("Interactable"));
     bReloading = false;
     bAutoReload = false;
 
     WeaponSystem->bIsDryAmmo = false;
-
     // Weapon_Details는 BeginPlay에서 WeaponData로부터 초기화됩니다
 }
 
@@ -66,15 +71,16 @@ void AMasterWeapon::BeginPlay()
     {
         UE_LOG(LogTemp, Warning, TEXT("MasterWeapon::BeginPlay - WeaponData is not assigned! Using default ammo values."));
     }
+
+    // TODO: 월드 스폰시에는 물리 적용 안되나, 드롭시에는 적용
+    WeaponMesh->SetSimulatePhysics(true);
+    WeaponMesh->SetEnableGravity(true);
+    WeaponMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    WeaponMesh->SetCollisionResponseToAllChannels(ECR_Block);
 }
 
 void AMasterWeapon::FireBullet(FHitResult Hit, bool bReturnHit)
 {
-    // ===== 디버그 로그 추가 =====
-    UE_LOG(LogTemp, Warning, TEXT("[FireBullet] Hit.Location: %s, bBlockingHit: %d"),
-        *Hit.Location.ToString(), Hit.bBlockingHit);
-    // ===========================
-
     for (int32 curBurst = 0; curBurst < WeaponData->BurstAmount; curBurst++)
     {
         float PointX, PointY;
@@ -89,10 +95,6 @@ void AMasterWeapon::FireBullet(FHitResult Hit, bool bReturnHit)
         FVector SpreadAdjustedHitLocation = Hit.Location + CameraManager->GetActorRightVector() * PointX + CameraManager->GetActorUpVector() * PointY;
         FVector MuzzleLocation = WeaponMesh->GetSocketLocation(FName("Muzzle"));
 
-        // ===== 디버그 로그 추가 =====
-        UE_LOG(LogTemp, Warning, TEXT("[FireBullet] MuzzleLocation: %s"), *MuzzleLocation.ToString());
-        UE_LOG(LogTemp, Warning, TEXT("[FireBullet] SpreadAdjustedHitLocation: %s"), *SpreadAdjustedHitLocation.ToString());
-        // ===========================
         // BulletDirection represents the direction from the muzzle to the target.
         // Calculate the direction vector of the trajectory 
         // by subtracting the aim point position from the muzzle position.
@@ -303,6 +305,53 @@ float AMasterWeapon::GetMaxAmmo() const
 float AMasterWeapon::GetCurrentAmmo() const
 {
     return WeaponSystem->Weapon_Details.Weapon_Data.CurrentAmmo;
+}
+
+AMasterWeapon* AMasterWeapon::SpawnDroppedWeapon(UWorld* World, UWeaponData* WeaponData, const FVector& Location, const FRotator& Rotation, AActor* Owner)
+{
+    if (!World || !WeaponData || !WeaponData->EquipmentClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("SpawnDroppedWeapon: Invalid parameters"));
+        return nullptr;
+    }
+
+    // Setup spawn parameters
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = Owner;
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+    // Spawn the weapon actor
+    AActor* SpawnedActor = World->SpawnActor<AActor>(
+        WeaponData->EquipmentClass,
+        Location,
+        Rotation,
+        SpawnParams
+    );
+
+    AMasterWeapon* SpawnedWeapon = Cast<AMasterWeapon>(SpawnedActor);
+    if (!SpawnedWeapon)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("SpawnDroppedWeapon: Failed to cast spawned actor to AMasterWeapon"));
+        return nullptr;
+    }
+
+    // Set weapon data
+    SpawnedWeapon->WeaponData = WeaponData;
+
+    // Enable physics simulation for dropped weapon
+    if (SpawnedWeapon->WeaponMesh)
+    {
+        SpawnedWeapon->WeaponMesh->SetSimulatePhysics(true);
+        SpawnedWeapon->WeaponMesh->SetEnableGravity(true);
+        SpawnedWeapon->WeaponMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+        SpawnedWeapon->WeaponMesh->SetCollisionResponseToAllChannels(ECR_Block);
+
+        UE_LOG(LogTemp, Log, TEXT("SpawnDroppedWeapon: Spawned '%s' at %s with physics enabled"),
+            *WeaponData->ItemName.ToString(),
+            *Location.ToString());
+    }
+
+    return SpawnedWeapon;
 }
 
 bool AMasterWeapon::ApplyHit(const FHitResult HitResult, bool& ValidHit)
@@ -553,5 +602,277 @@ void AMasterWeapon::Reload()
         ReloadDelay,
         false
     );
+}
+
+//==============================================================================
+// IInteractable Interface Implementation
+//==============================================================================
+
+FInteractionResult AMasterWeapon::ExecuteInteraction_Implementation(const FInteractionContext& Context)
+{
+    if (!Context.InstigatorRef || !Context.InstigatorPawn)
+    {
+        return FInteractionResult::Failure(FText::FromString("Invalid instigator"));
+    }
+
+    // Get the player character
+    APlayer_Base* Player = Cast<APlayer_Base>(Context.InstigatorPawn);
+    if (!Player)
+    {
+        return FInteractionResult::Failure(FText::FromString("Only players can pick up weapons"));
+    }
+
+    // Get the equipment system
+    UEquipmentSystem* EquipmentSys = Player->FindComponentByClass<UEquipmentSystem>();
+    if (!EquipmentSys)
+    {
+        return FInteractionResult::Failure(FText::FromString("Player has no equipment system"));
+    }
+
+    // Get inventory system
+    UInventorySystem* InventorySys = Player->FindComponentByClass<UInventorySystem>();
+
+    // Check if we have weapon data
+    if (!WeaponData)
+    {
+        return FInteractionResult::Failure(FText::FromString("Weapon has no data"));
+    }
+
+    // Determine which slot to equip to based on weapon type
+    EEquipmentSlot TargetSlot = WeaponData->ValidSlot;
+
+    // Check if the target slot already has a weapon equipped
+    bool bSlotOccupied = EquipmentSys->IsEquipped(TargetSlot);
+
+    if (bSlotOccupied)
+    {
+        // Slot is occupied - Hold completed, swap weapons
+        UE_LOG(LogTemp, Log, TEXT("AMasterWeapon::ExecuteInteraction - Swapping weapons"));
+
+        // Unequip current weapon (this will drop it)
+        UWeaponData* DroppedWeaponData = EquipmentSys->Unequip(TargetSlot);
+
+        // Spawn dropped weapon actor in world
+        if (DroppedWeaponData)
+        {
+            // Calculate spawn location in front of player
+            FVector PlayerLocation = Player->GetActorLocation();
+            FVector PlayerForward = Player->GetActorForwardVector();
+            FVector SpawnLocation = PlayerLocation + (PlayerForward * 100.0f) + FVector(0.0f, 0.0f, -50.0f);
+            FRotator SpawnRotation = Player->GetActorRotation();
+
+            // Spawn dropped weapon with physics enabled
+            AMasterWeapon* DroppedWeapon = SpawnDroppedWeapon(
+                GetWorld(),
+                DroppedWeaponData,
+                SpawnLocation,
+                SpawnRotation,
+                Player
+            );
+
+            if (!DroppedWeapon)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Failed to spawn dropped weapon"));
+            }
+        }
+
+        // Equip new weapon
+        EquipmentSys->Equip(TargetSlot, WeaponData);
+
+        // Destroy the world weapon actor
+        Destroy();
+
+        return FInteractionResult::Success();
+    }
+    else
+    {
+        // Slot is empty - equip directly
+        EquipmentSys->Equip(TargetSlot, WeaponData);
+
+        // Destroy the world weapon actor (since it's now equipped)
+        Destroy();
+
+        UE_LOG(LogTemp, Log, TEXT("AMasterWeapon::ExecuteInteraction - Weapon equipped to slot"));
+        return FInteractionResult::Success();
+    }
+}
+
+bool AMasterWeapon::CanInteract_Implementation(AController* InstigatorRef) const
+{
+    if (!InstigatorRef)
+        return false;
+
+    // Check if the weapon is already equipped
+    if (GetAttachParentActor())
+    {
+        // Weapon is already attached to someone
+        return false;
+    }
+
+    return true;
+}
+
+FText AMasterWeapon::GetInteractionPrompt_Implementation() const
+{
+    // Try to get player and equipment system to check slot status
+    APlayerController* PC = GetWorld()->GetFirstPlayerController();
+    if (PC)
+    {
+        APlayer_Base* Player = Cast<APlayer_Base>(PC->GetPawn());
+        if (Player)
+        {
+            UEquipmentSystem* EquipmentSys = Player->FindComponentByClass<UEquipmentSystem>();
+            if (EquipmentSys && WeaponData)
+            {
+                EEquipmentSlot TargetSlot = WeaponData->ValidSlot;
+                bool bSlotOccupied = EquipmentSys->IsEquipped(TargetSlot);
+
+                FString WeaponName = WeaponData->ItemName.IsEmpty()
+                    ? TEXT("weapon")
+                    : WeaponData->ItemName.ToString();
+
+                if (bSlotOccupied)
+                {
+                    // Slot occupied - Hold to swap, short press to add to inventory
+                    return FText::Format(
+                        FText::FromString("[E] Add {0} to inventory | [Hold E] Swap weapons"),
+                        FText::FromString(WeaponName)
+                    );
+                }
+                else
+                {
+                    // Slot empty - will equip directly
+                    return FText::Format(
+                        FText::FromString("[E] Pick up {0}"),
+                        FText::FromString(WeaponName)
+                    );
+                }
+            }
+        }
+    }
+
+    // Fallback
+    if (WeaponData && !WeaponData->ItemName.IsEmpty())
+    {
+        return FText::Format(
+            FText::FromString("[E] Pick up {0}"),
+            WeaponData->ItemName
+        );
+    }
+
+    return FText::FromString("[E] Pick up weapon");
+}
+
+bool AMasterWeapon::IsHoldInteraction_Implementation() const
+{
+    // For now, all interactions are instant
+    // TODO: Implement Hold to swap later
+    return false;
+}
+
+float AMasterWeapon::GetHoldDuration_Implementation() const
+{
+    // Hold duration for weapon swap
+    return IsHoldInteraction_Implementation() ? 1.0f : 0.0f;
+}
+
+bool AMasterWeapon::IsSingleUse_Implementation() const
+{
+    // Weapon can only be picked up once (until dropped again)
+    return true;
+}
+
+void AMasterWeapon::SetHighlighted_Implementation(bool bHighlight)
+{
+    bIsHighlighted = bHighlight;
+
+    // Apply highlight effect to weapon mesh
+    if (WeaponMesh)
+    {
+        if (bHighlight)
+        {
+            // Enable custom depth for outline effect
+            WeaponMesh->SetRenderCustomDepth(true);
+            WeaponMesh->SetCustomDepthStencilValue(1);
+        }
+        else
+        {
+            // Disable custom depth
+            WeaponMesh->SetRenderCustomDepth(false);
+        }
+    }
+}
+
+void AMasterWeapon::OnInteractionStarted_Implementation(const FInteractionContext& Context)
+{
+    // Not used - Hold is managed by Enhanced Input
+}
+
+void AMasterWeapon::OnInteractionCancelled_Implementation(const FInteractionContext& Context)
+{
+    // Short press - add to inventory
+    if (!Context.InstigatorPawn)
+        return;
+
+    APlayer_Base* Player = Cast<APlayer_Base>(Context.InstigatorPawn);
+    if (!Player)
+        return;
+
+    UEquipmentSystem* EquipmentSys = Player->FindComponentByClass<UEquipmentSystem>();
+    UInventorySystem* InventorySys = Player->FindComponentByClass<UInventorySystem>();
+
+    if (!WeaponData)
+        return;
+
+    EEquipmentSlot TargetSlot = WeaponData->ValidSlot;
+    bool bSlotOccupied = EquipmentSys && EquipmentSys->IsEquipped(TargetSlot);
+
+    if (bSlotOccupied)
+    {
+        // Slot occupied - add to inventory
+        if (InventorySys)
+        {
+            // Try to add weapon to inventory
+            bool bAdded = InventorySys->TryAddItemEmptySpot(WeaponData, 1);
+
+            if (bAdded)
+            {
+                UE_LOG(LogTemp, Log, TEXT("AMasterWeapon::OnInteractionCancelled - Added %s to inventory"),
+                    *WeaponData->ItemName.ToString());
+
+                // Destroy the world weapon actor
+                Destroy();
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("AMasterWeapon::OnInteractionCancelled - Inventory is full"));
+            }
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("No inventory system available"));
+        }
+    }
+    else
+    {
+        // Slot empty - equip directly (short press on empty slot)
+        if (EquipmentSys)
+        {
+            EquipmentSys->Equip(TargetSlot, WeaponData);
+            Destroy();
+            UE_LOG(LogTemp, Log, TEXT("AMasterWeapon::OnInteractionCancelled - Weapon equipped"));
+        }
+    }
+}
+
+AActor* AMasterWeapon::GetInteractableActor_Implementation()
+{
+    return this;
+}
+
+UInteractionData* AMasterWeapon::GetInteractionData_Implementation() const
+{
+    // Not using InteractionData - using direct interface methods instead
+    return nullptr;
 }
 

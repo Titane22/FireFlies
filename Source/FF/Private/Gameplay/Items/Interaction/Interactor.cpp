@@ -2,6 +2,7 @@
 
 #include "Gameplay/Items/Interaction/Interactor.h"
 #include "Gameplay/Items/Interaction/Interaction.h"
+#include "Gameplay/Interfaces/Interactable.h"
 #include "Gameplay/Data/InteractionData.h"
 #include "Gameplay/Characters/Player_Base.h"
 #include "Camera/CameraComponent.h"
@@ -114,36 +115,38 @@ void UInteractor::DetectInteractions()
 		StopCurrentInteraction();
 		return;
 	}
-
-	// AInteraction으로 캐스팅 시도
-	AInteraction* HitInteraction = Cast<AInteraction>(HitResult.GetActor());
-	if (!HitInteraction)
+	AActor* HitActor = HitResult.GetActor();
+	if (!HitActor)
 	{
-		// Interaction이 아닌 다른 액터
-		UE_LOG(LogTemp, Warning, TEXT("Hit actor is not AInteraction: %s"), *HitResult.GetActor()->GetName());
+		StopCurrentInteraction();
+		return;
+	}
+
+	// IInteractable 인터페이스 구현 여부 체크
+	if (!HitActor->Implements<UInteractable>())
+	{
+		// IInteractable 인터페이스를 구현하지 않음
 		StopCurrentInteraction();
 		return;
 	}
 
 	// 상호작용 가능 여부 체크
 	AController* PC = CharacterRef->GetController();
-	if (!PC || !HitInteraction->CanInteract(PC))
+	IInteractable* Interactable = Cast<IInteractable>(HitActor);
+	if (!PC || !Interactable || !IInteractable::Execute_CanInteract(HitActor, PC))
 	{
 		// 상호작용 불가능
-		UE_LOG(LogTemp, Warning, TEXT("CanInteract failed for: %s (PlayerController: %s)"),
-			*HitInteraction->GetName(),
-			PC ? TEXT("Valid") : TEXT("NULL"));
 		StopCurrentInteraction();
 		return;
 	}
 
 	// 이미 같은 대상이면 유지
-	if (CurrentInteraction.IsValid() && CurrentInteraction.Get() == HitInteraction)
+	if (CurrentInteractionActor.IsValid() && CurrentInteractionActor.Get() == HitActor)
 		return;
 
 	// 새로운 상호작용 시작
 	StopCurrentInteraction();
-	StartNewInteraction(HitInteraction);
+	StartNewInteraction(HitActor);
 }
 
 bool UInteractor::GetTraceStartEnd(FVector& OutStart, FVector& OutEnd) const
@@ -155,15 +158,15 @@ bool UInteractor::GetTraceStartEnd(FVector& OutStart, FVector& OutEnd) const
 	{
 	case EInteractionMethod::Camera:
 		{
-			UCameraComponent* Camera = CharacterRef->GetFollowCamera();
-			if (!Camera)
+			APlayerCameraManager* PCM = GetWorld()->GetFirstPlayerController()->PlayerCameraManager;
+			if (!PCM)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("UInteractor: FollowCamera is null!"));
+				UE_LOG(LogTemp, Warning, TEXT("UInteractor: PlayerCameraManager is null!"));
 				return false;
 			}
-
-			OutStart = Camera->GetComponentLocation();
-			OutEnd = OutStart + (Camera->GetForwardVector() * DetectionDistance);
+			
+			OutStart = PCM->GetCameraLocation();
+			OutEnd = OutStart + (PCM->GetActorForwardVector() * DetectionDistance);
 			return true;
 		}
 
@@ -181,27 +184,28 @@ bool UInteractor::GetTraceStartEnd(FVector& OutStart, FVector& OutEnd) const
 
 void UInteractor::StopCurrentInteraction()
 {
-	if (!CurrentInteraction.IsValid())
+	if (!CurrentInteractionActor.IsValid())
 		return;
 
 	// 하이라이트 해제
-	if (AInteraction* Interaction = CurrentInteraction.Get())
+	AActor* Actor = CurrentInteractionActor.Get();
+	if (Actor && Actor->Implements<UInteractable>())
 	{
-		Interaction->SetHighlighted(false);
+		IInteractable::Execute_SetHighlighted(Actor, false);
 	}
 
-	CurrentInteraction.Reset();
+	CurrentInteractionActor.Reset();
 }
 
-void UInteractor::StartNewInteraction(AInteraction* NewInteraction)
+void UInteractor::StartNewInteraction(AActor* NewInteractionActor)
 {
-	if (!NewInteraction)
+	if (!NewInteractionActor || !NewInteractionActor->Implements<UInteractable>())
 		return;
 
-	CurrentInteraction = NewInteraction;
-	NewInteraction->SetHighlighted(true);
+	CurrentInteractionActor = NewInteractionActor;
+	IInteractable::Execute_SetHighlighted(NewInteractionActor, true);
 
-	UE_LOG(LogTemp, Log, TEXT("New interaction detected: %s"), *NewInteraction->GetName());
+	UE_LOG(LogTemp, Log, TEXT("New interaction detected: %s"), *NewInteractionActor->GetName());
 }
 
 //==============================================================================
@@ -210,14 +214,14 @@ void UInteractor::StartNewInteraction(AInteraction* NewInteraction)
 
 void UInteractor::TriggerInteraction()
 {
-	if (!CurrentInteraction.IsValid())
+	if (!CurrentInteractionActor.IsValid())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("TriggerInteraction: No current interaction!"));
 		return;
 	}
 
-	AInteraction* Interaction = CurrentInteraction.Get();
-	if (!Interaction)
+	AActor* InteractionActor = CurrentInteractionActor.Get();
+	if (!InteractionActor || !InteractionActor->Implements<UInteractable>())
 		return;
 
 	AController* PC = CharacterRef ? CharacterRef->GetController() : nullptr;
@@ -228,16 +232,20 @@ void UInteractor::TriggerInteraction()
 	}
 
 	// Hold 타입 체크
-	if (IsHoldInteraction())
+	bool bIsHold = IInteractable::Execute_IsHoldInteraction(InteractionActor);
+	if (bIsHold)
 	{
 		// Hold 시작
 		bIsInteracting = true;
 		InteractionStartTime = GetWorld()->GetTimeSeconds();
 
-		FInteractionContext Context(PC, Interaction, Interaction->GetInteractionData());
-		Interaction->OnInteractionStarted(Context);
+		FInteractionContext Context;
+		Context.InstigatorRef = PC;
+		Context.InstigatorPawn = CharacterRef;
 
-		UE_LOG(LogTemp, Log, TEXT("Hold interaction started: %s"), *Interaction->GetName());
+		IInteractable::Execute_OnInteractionStarted(InteractionActor, Context);
+
+		UE_LOG(LogTemp, Log, TEXT("Hold interaction started: %s"), *InteractionActor->GetName());
 	}
 	else
 	{
@@ -248,11 +256,11 @@ void UInteractor::TriggerInteraction()
 
 void UInteractor::CancelInteraction()
 {
-	if (!bIsInteracting || !CurrentInteraction.IsValid())
+	if (!bIsInteracting || !CurrentInteractionActor.IsValid())
 		return;
 
-	AInteraction* Interaction = CurrentInteraction.Get();
-	if (!Interaction)
+	AActor* InteractionActor = CurrentInteractionActor.Get();
+	if (!InteractionActor || !InteractionActor->Implements<UInteractable>())
 		return;
 
 	AController* PC = CharacterRef ? CharacterRef->GetController() : nullptr;
@@ -262,19 +270,22 @@ void UInteractor::CancelInteraction()
 	bIsInteracting = false;
 	InteractionStartTime = 0.0f;
 
-	FInteractionContext Context(PC, Interaction, Interaction->GetInteractionData());
-	Interaction->OnInteractionCancelled(Context);
+	FInteractionContext Context;
+	Context.InstigatorRef = PC;
+	Context.InstigatorPawn = CharacterRef;
 
-	UE_LOG(LogTemp, Log, TEXT("Interaction cancelled: %s"), *Interaction->GetName());
+	IInteractable::Execute_OnInteractionCancelled(InteractionActor, Context);
+
+	UE_LOG(LogTemp, Log, TEXT("Interaction cancelled: %s"), *InteractionActor->GetName());
 }
 
 void UInteractor::ExecuteCurrentInteraction()
 {
-	if (!CurrentInteraction.IsValid())
+	if (!CurrentInteractionActor.IsValid())
 		return;
 
-	AInteraction* Interaction = CurrentInteraction.Get();
-	if (!Interaction)
+	AActor* InteractionActor = CurrentInteractionActor.Get();
+	if (!InteractionActor || !InteractionActor->Implements<UInteractable>())
 		return;
 
 	AController* PC = CharacterRef ? CharacterRef->GetController() : nullptr;
@@ -288,21 +299,25 @@ void UInteractor::ExecuteCurrentInteraction()
 	float Distance = 0.0f;
 	if (CharacterRef)
 	{
-		Distance = FVector::Dist(CharacterRef->GetActorLocation(), Interaction->GetActorLocation());
+		Distance = FVector::Dist(CharacterRef->GetActorLocation(), InteractionActor->GetActorLocation());
 	}
 
 	// Context 생성 및 실행
-	FInteractionContext Context(PC, Interaction, Interaction->GetInteractionData(), Distance);
-	FInteractionResult Result = Interaction->ExecuteInteraction(Context);
+	FInteractionContext Context;
+	Context.InstigatorRef = PC;
+	Context.InstigatorPawn = CharacterRef;
+	Context.Distance = Distance;
+
+	FInteractionResult Result = IInteractable::Execute_ExecuteInteraction(InteractionActor, Context);
 
 	if (Result.bSuccess)
 	{
-		UE_LOG(LogTemp, Log, TEXT("Interaction succeeded: %s"), *Interaction->GetName());
+		UE_LOG(LogTemp, Log, TEXT("Interaction succeeded: %s"), *InteractionActor->GetName());
 	}
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Interaction failed: %s - %s"),
-			*Interaction->GetName(),
+			*InteractionActor->GetName(),
 			*Result.FailureReason.ToString());
 	}
 
@@ -311,8 +326,8 @@ void UInteractor::ExecuteCurrentInteraction()
 	InteractionStartTime = 0.0f;
 
 	// SingleUse면 자동으로 하이라이트 해제
-	UInteractionData* Data = Interaction->GetInteractionData();
-	if (Data && Data->bSingleUse)
+	bool bIsSingleUse = IInteractable::Execute_IsSingleUse(InteractionActor);
+	if (bIsSingleUse)
 	{
 		StopCurrentInteraction();
 	}
@@ -324,23 +339,38 @@ void UInteractor::ExecuteCurrentInteraction()
 
 UInteractionData* UInteractor::GetCurrentInteractionData() const
 {
-	if (!CurrentInteraction.IsValid())
+	// Legacy support - returns InteractionData if actor provides it
+	if (!CurrentInteractionActor.IsValid())
 		return nullptr;
 
-	AInteraction* Interaction = CurrentInteraction.Get();
-	return Interaction ? Interaction->GetInteractionData() : nullptr;
+	AActor* Actor = CurrentInteractionActor.Get();
+	if (!Actor || !Actor->Implements<UInteractable>())
+		return nullptr;
+
+	return IInteractable::Execute_GetInteractionData(Actor);
 }
 
 EInteractiveType UInteractor::GetCurrentInteractionType() const
 {
+	// Try to get from InteractionData first (legacy support)
 	UInteractionData* Data = GetCurrentInteractionData();
-	return Data ? Data->InteractionType : EInteractiveType::Default;
+	if (Data)
+		return Data->InteractionType;
+
+	// Default
+	return EInteractiveType::Default;
 }
 
 bool UInteractor::IsHoldInteraction() const
 {
-	UInteractionData* Data = GetCurrentInteractionData();
-	return Data ? Data->IsHoldInteraction() : false;
+	if (!CurrentInteractionActor.IsValid())
+		return false;
+
+	AActor* Actor = CurrentInteractionActor.Get();
+	if (!Actor || !Actor->Implements<UInteractable>())
+		return false;
+
+	return IInteractable::Execute_IsHoldInteraction(Actor);
 }
 
 float UInteractor::GetHoldProgress() const
@@ -348,10 +378,29 @@ float UInteractor::GetHoldProgress() const
 	if (!bIsInteracting || !IsHoldInteraction() || !GetWorld())
 		return 0.0f;
 
-	UInteractionData* Data = GetCurrentInteractionData();
-	if (!Data || Data->HoldDuration <= 0.0f)
+	if (!CurrentInteractionActor.IsValid())
+		return 0.0f;
+
+	AActor* Actor = CurrentInteractionActor.Get();
+	if (!Actor || !Actor->Implements<UInteractable>())
+		return 0.0f;
+
+	float HoldDuration = IInteractable::Execute_GetHoldDuration(Actor);
+	if (HoldDuration <= 0.0f)
 		return 0.0f;
 
 	const float ElapsedTime = GetWorld()->GetTimeSeconds() - InteractionStartTime;
-	return FMath::Clamp(ElapsedTime / Data->HoldDuration, 0.0f, 1.0f);
+	return FMath::Clamp(ElapsedTime / HoldDuration, 0.0f, 1.0f);
+}
+
+FText UInteractor::GetCurrentInteractionPrompt() const
+{
+	if (!CurrentInteractionActor.IsValid())
+		return FText::GetEmpty();
+
+	AActor* Actor = CurrentInteractionActor.Get();
+	if (!Actor || !Actor->Implements<UInteractable>())
+		return FText::GetEmpty();
+
+	return IInteractable::Execute_GetInteractionPrompt(Actor);
 }

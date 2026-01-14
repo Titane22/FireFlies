@@ -3,7 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Components/SphereComponent.h"
 #include "Gameplay/Items/Equipments/EquipmentBase.h"
+#include "Gameplay/Interfaces/Interactable.h"
 #include "MasterWeapon.generated.h"
 
 class AFFCharacter;
@@ -12,9 +14,10 @@ class UWeaponData;
 class UWeaponSystem;
 class APlayer_Base;
 class AIWeaponPickup;
+class UInteractionData;
 
 UCLASS()
-class FF_API AMasterWeapon : public AEquipmentBase
+class FF_API AMasterWeapon : public AEquipmentBase, public IInteractable
 {
 	GENERATED_BODY()
 	
@@ -36,11 +39,11 @@ protected:
 public:	
 	// 컴포넌트들
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USceneComponent* DefaultSceneRoot;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	USkeletalMeshComponent* WeaponMesh;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	USphereComponent* InteractCollision;
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UWeaponSystem* WeaponSystem;
 
@@ -83,4 +86,28 @@ public:
 	float GetMaxAmmo() const;
 
 	float GetCurrentAmmo() const;
+
+	/** Spawn a dropped weapon in the world with physics enabled */
+	static AMasterWeapon* SpawnDroppedWeapon(UWorld* World, UWeaponData* WeaponData, const FVector& Location, const FRotator& Rotation, AActor* Owner = nullptr);
+
+	//==============================================================================
+	// IInteractable Interface
+	//==============================================================================
+
+	virtual FInteractionResult ExecuteInteraction_Implementation(const FInteractionContext& Context) override;
+	virtual bool CanInteract_Implementation(AController* InstigatorRef) const override;
+	virtual FText GetInteractionPrompt_Implementation() const override;
+	virtual bool IsHoldInteraction_Implementation() const override;
+	virtual float GetHoldDuration_Implementation() const override;
+	virtual bool IsSingleUse_Implementation() const override;
+	virtual void SetHighlighted_Implementation(bool bHighlight) override;
+	virtual void OnInteractionStarted_Implementation(const FInteractionContext& Context) override;
+	virtual void OnInteractionCancelled_Implementation(const FInteractionContext& Context) override;
+	virtual AActor* GetInteractableActor_Implementation() override;
+	virtual UInteractionData* GetInteractionData_Implementation() const override;
+
+protected:
+	/** 하이라이트 상태 */
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	bool bIsHighlighted = false;
 };

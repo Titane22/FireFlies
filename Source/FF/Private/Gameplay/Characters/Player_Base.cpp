@@ -5,6 +5,8 @@
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
 #include "Gameplay/Items/EquipmentSystem.h"
 #include "Gameplay/Items/InventorySystem.h"
+#include "Gameplay/Items/Interaction/Interactor.h"
+#include "Gameplay/Interfaces/Interactable.h"
 #include "Gameplay/Data/WeaponData.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -31,6 +33,10 @@ void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputC
 
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &APlayer_Base::Reload);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlayer_Base::ShootFire);
+
+		// Interact actions - Hold support
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &APlayer_Base::Interact_Started);
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, this, &APlayer_Base::Interact_Completed);
 	}
 }
 
@@ -299,4 +305,123 @@ void APlayer_Base::OnMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 	{
 		bCanSwitchWeapon = true;
 	}
+}
+
+void APlayer_Base::Interact_Started()
+{
+	// Reset hold flag when starting interaction
+	bInteractHoldTriggered = false;
+
+	// Record the start time for hold detection
+	InteractStartTime = GetWorld()->GetTimeSeconds();
+
+	// Start timer for hold detection
+	GetWorld()->GetTimerManager().SetTimer(
+		InteractHoldTimerHandle,
+		this,
+		&APlayer_Base::OnInteractHoldCompleted,
+		HoldThreshold,
+		false
+	);
+
+	UE_LOG(LogTemp, Log, TEXT("Interact_Started - Timer started for %.2f seconds"), HoldThreshold);
+}
+
+void APlayer_Base::Interact_Triggered()
+{
+	// This event is triggered by Enhanced Input when Hold Trigger is configured in Blueprint
+	// We're not using this anymore - using manual time check in Interact_Completed instead
+	// Keep this for compatibility if Hold Trigger is configured in Blueprint
+
+	UE_LOG(LogTemp, Log, TEXT("Interact_Triggered - (Not used - using manual time check)"));
+}
+
+void APlayer_Base::OnInteractHoldCompleted()
+{
+	// Timer completed - this is a HOLD
+	bInteractHoldTriggered = true;
+
+	UE_LOG(LogTemp, Log, TEXT("OnInteractHoldCompleted - HOLD timer finished, executing swap"));
+
+	// Check if there's an active interaction
+	if (!Interactor)
+		return;
+
+	if (!Interactor->HasActiveInteraction())
+		return;
+
+	AActor* InteractionActor = Interactor->GetCurrentInteractionActor();
+	if (!InteractionActor || !InteractionActor->Implements<UInteractable>())
+		return;
+
+	AController* PC = GetController();
+	if (!PC)
+		return;
+
+	FInteractionContext Context;
+	Context.InstigatorRef = PC;
+	Context.InstigatorPawn = this;
+
+	// HOLD - Execute interaction (swap weapon)
+	FInteractionResult Result = IInteractable::Execute_ExecuteInteraction(InteractionActor, Context);
+
+	if (Result.bSuccess)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Hold interaction succeeded"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Hold interaction failed: %s"), *Result.FailureReason.ToString());
+	}
+
+	Interactor->StopCurrentInteraction();
+}
+
+void APlayer_Base::Interact_Completed()
+{
+	// Button released - cancel timer if still running
+	if (GetWorld()->GetTimerManager().IsTimerActive(InteractHoldTimerHandle))
+	{
+		// Timer still active = button released before hold completed = SHORT PRESS
+		GetWorld()->GetTimerManager().ClearTimer(InteractHoldTimerHandle);
+
+		UE_LOG(LogTemp, Log, TEXT("Interact_Completed - SHORT PRESS detected, adding to inventory"));
+
+		// Check if there's an active interaction
+		if (!Interactor)
+			return;
+
+		if (!Interactor->HasActiveInteraction())
+			return;
+
+		AActor* InteractionActor = Interactor->GetCurrentInteractionActor();
+		if (!InteractionActor || !InteractionActor->Implements<UInteractable>())
+			return;
+
+		AController* PC = GetController();
+		if (!PC)
+			return;
+
+		FInteractionContext Context;
+		Context.InstigatorRef = PC;
+		Context.InstigatorPawn = this;
+
+		// SHORT PRESS - Add to inventory or equip
+		IInteractable::Execute_OnInteractionCancelled(InteractionActor, Context);
+
+		Interactor->StopCurrentInteraction();
+	}
+	else
+	{
+		// Timer already finished = hold was completed
+		UE_LOG(LogTemp, Log, TEXT("Interact_Completed - After HOLD (already handled)"));
+	}
+}
+
+void APlayer_Base::Interact()
+{
+	// Legacy - direct call support
+	Interact_Started();
+	Interact_Triggered();
+	Interact_Completed();
 }

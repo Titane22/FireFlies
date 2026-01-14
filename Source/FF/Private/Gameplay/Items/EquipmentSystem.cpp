@@ -70,6 +70,17 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData)
 	{
 		TargetChild->SetChildActorClass(EquipSlot.EquipmentClass);
 		TargetChild->CreateChildActor();
+
+		// Disable physics immediately after creation
+		if (AMasterWeapon* Weapon = Cast<AMasterWeapon>(TargetChild->GetChildActor()))
+		{
+			if (Weapon->WeaponMesh)
+			{
+				Weapon->WeaponMesh->SetSimulatePhysics(false);
+				Weapon->WeaponMesh->SetEnableGravity(false);
+				UE_LOG(LogTemp, Log, TEXT("[Equip] Disabled physics for newly created weapon"));
+			}
+		}
 	}
 	// 3. 타겟 Child Actor에 붙이기
 	if (!CharacterRef->GetMesh())
@@ -91,6 +102,7 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData)
 		{
 			Weapon->WeaponSystem->CharacterRef = CharacterRef;
 		}
+		// Note: Physics is automatically ignored when attached to character
 	}
 	Equipped.Emplace(Slot, EquipSlot);
 }
@@ -412,6 +424,7 @@ bool UEquipmentSystem::PickupAndEquipWeapon(TSubclassOf<AMasterWeapon> NewWeapon
 			NewWeapon->WeaponSystem->CharacterRef = CharacterRef;
 			UE_LOG(LogTemp, Log, TEXT("PickupAndEquipWeapon: CharacterRef manually set for new weapon"));
 		}
+		// Note: Physics is automatically ignored when attached to character
 	}
 
 	// 무기 클래스 업데이트

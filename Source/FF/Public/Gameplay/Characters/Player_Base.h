@@ -31,6 +31,9 @@ protected:
 	UInputAction* ReloadAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* InteractAction;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SwitchWeaponsAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -68,6 +71,21 @@ protected:
 	void ReadyToFire(AMasterWeapon* MasterWeapon, UWeaponData* CurrentWeaponDataAsset);
 
 	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	void Interact_Started();
+	void Interact_Triggered(); // Hold completed (for Enhanced Input Hold Trigger)
+	void Interact_Completed(); // Key released
+	void Interact();
+
+private:
+	bool bInteractHoldTriggered = false;
+	float InteractStartTime = 0.0f;
+	FTimerHandle InteractHoldTimerHandle;
+
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	float HoldThreshold = 1.0f; // Hold time in seconds
+
+	void OnInteractHoldCompleted();
 
 public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Camera")

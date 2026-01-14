@@ -7,6 +7,7 @@
 #include "Gameplay/Data/ItemData.h"
 #include "FFCharacter.generated.h"
 
+class UInteractor;
 class UHurtbox;
 class UHealthSystem;
 class UInventorySystem;
@@ -76,6 +77,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UHurtbox* Hurtbox;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UInteractor* Interactor;
+	
 	bool bCanSwitchWeapon = true;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Combat")

@@ -10,6 +10,7 @@
 #include "Gameplay/Items/EquipmentSystem.h"
 #include "Gameplay/Items/InventorySystem.h"
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
+#include "Gameplay/Items/Interaction/Interactor.h"
 
 // Sets default values
 AFFCharacter::AFFCharacter()
@@ -25,6 +26,7 @@ AFFCharacter::AFFCharacter()
 	InventorySystem = CreateDefaultSubobject<UInventorySystem>("InventorySystem");
 	HealthComponent = CreateDefaultSubobject<UHealthSystem>("HealthComponent");
 	Hurtbox = CreateDefaultSubobject<UHurtbox>("Hurtbox");
+	Interactor = CreateDefaultSubobject<UInteractor>("Interactor");
 	FlashlightChild = CreateDefaultSubobject<UChildActorComponent>("FlashlightChild");
 
 	Primary->SetupAttachment(RootComponent);
@@ -55,6 +57,10 @@ void AFFCharacter::BeginPlay()
 	if (Hurtbox)
 	{
 		Hurtbox->CharacterRef = this;
+	}
+	if (Interactor)
+	{
+		//Interactor->Chac
 	}
 	
 	if (EquipmentSystem)
