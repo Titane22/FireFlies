@@ -4,9 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "NiagaraSystem.h"
-#include "NiagaraFunctionLibrary.h"
-#include "NiagaraComponent.h"
 #include "WeaponSystem.generated.h"
 
 #define COLLISION_BULLET ECollisionChannel::ECC_GameTraceChannel1
@@ -83,7 +80,7 @@ public:
 	float ReloadMontage(UAnimMontage* ReloadAnim);
 
 	void ReloadCheck();
-
+	
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	USkeletalMesh* WeaponMesh;

@@ -28,6 +28,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	virtual void FlashOnOff();
 
+protected:
+	virtual void BeginPlay();
+
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	virtual void SwitchWeapon(EEquipmentSlot Slot);
+	
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	virtual void SwitchToPrimaryWeapon();
+
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	virtual void SwitchToHandgunWeapon();
+	
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
 	TMap<EEquipmentSlot, UChildActorComponent*> EquippedChilds;
@@ -63,4 +75,20 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UHurtbox* Hurtbox;
+
+	bool bCanSwitchWeapon = true;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Combat")
+	bool bFiring;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Equipment|Action")
+	bool bIsAiming;
+
+	bool bCanFire = true;
+
+	bool IsCrouch;
+
+	bool IsSprint;
+
+	bool bIsDodging;
 };

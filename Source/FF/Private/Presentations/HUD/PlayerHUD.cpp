@@ -36,9 +36,7 @@ UW_DynamicWeaponHUD* APlayerHUD::ShowWeaponUI(UWeaponData* WeaponData, int32 Max
 		UE_LOG(LogTemp, Error, TEXT("[ShowWeaponUI] Failed to cast to UW_DynamicWeaponHUD"));
 		return nullptr;
 	}
-
 	CurrentWeaponUI->AddToViewport();
-	//GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, FString::Printf(TEXT("Called: %s"), *CurrentWeaponUI->GetName()));
 	
 	return CurrentWeaponUI;
 }

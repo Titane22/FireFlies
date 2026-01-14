@@ -6,7 +6,11 @@
 #include "Gameplay/Characters/FFCharacter.h"
 #include "Player_Base.generated.h"
 
+class APC_Base;
+class AMasterWeapon;
 class UInputAction;
+class UWeaponData;
+struct FInputActionValue;
 
 /**
  * 
@@ -15,7 +19,7 @@ UCLASS()
 class FF_API APlayer_Base : public AFFCharacter
 {
 	GENERATED_BODY()
-
+	
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputMappingContext* DefaultMappingContext;
@@ -34,7 +38,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SwitchHandgunAction;
-	
+
+	UPROPERTY(BlueprintReadWrite, Category = "Equipment")
+	AMasterWeapon* CurrentWeapon;
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
 	class UW_DynamicWeaponHUD* CurrentWeaponUI;
@@ -44,10 +50,33 @@ protected:
 	 
 	virtual void BeginPlay();
 	
+	virtual void SwitchWeapon(EEquipmentSlot Slot) override;
+
+	virtual void SwitchToPrimaryWeapon() override;
+	virtual void SwitchToHandgunWeapon() override;
+
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	void UpdateWeaponUI(UWeaponData* WeaponData);
+
+	void ShootFire(const FInputActionValue& Value);
+
+	void Reload();
+	
+	bool CanFire();
+
+	void HandleFiring();
+	void ReadyToFire(AMasterWeapon* MasterWeapon, UWeaponData* CurrentWeaponDataAsset);
+
+	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
 public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Camera")
 	class UCameraComponent* GetFollowCamera() const;
 	
 	UFUNCTION(BlueprintImplementableEvent, Category = "Camera")
 	class USpringArmComponent* GetCameraBoom() const;
+
+	APlayerCameraManager* GetPlayerCameraManager() const;
+	
+	bool CanSwitchWeapon();
 };

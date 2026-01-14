@@ -17,6 +17,32 @@ UEquipmentSystem::UEquipmentSystem()
 	CurrentEquippedSlot = EEquipmentSlot::None;
 }
 
+void UEquipmentSystem::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	// 무기 클래스는 Blueprint에서 설정됩니다 (Data-Driven)
+	for (const auto& Pair : DefaultEquipments)
+	{
+		EEquipmentSlot Slot = Pair.Key;
+		UItemData* ItemData = Pair.Value;
+
+		if (!ItemData)
+		{
+			UE_LOG(LogTemp, Error, TEXT("UEquipmentSystem::BeginPlay - ItemData is NULL"));
+			continue;
+		}
+		FEquipmentSlot EquipmentSlot;
+		EquipmentSlot.ItemData = ItemData;
+		EquipmentSlot.EquipmentClass = ItemData->EquipmentClass;
+		EquipmentSlot.Slot = Slot;
+		
+		Equipped.Add(Slot, EquipmentSlot);
+		UE_LOG(LogTemp, Log, TEXT("[EquipmentSystem] Initialized slot %d with %s"),
+			  (int32)Slot, *ItemData->ItemName.ToString());
+	}
+}
+
 void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData)
 {
 	if (!ItemData || !CharacterRef)
@@ -101,32 +127,6 @@ UWeaponData* UEquipmentSystem::Unequip(EEquipmentSlot Slot)
 	}
 	
 	return WeaponData;
-}
-
-void UEquipmentSystem::BeginPlay()
-{
-	Super::BeginPlay();
-	
-	// 무기 클래스는 Blueprint에서 설정됩니다 (Data-Driven)
-	for (const auto& Pair : DefaultEquipments)
-	{
-		EEquipmentSlot Slot = Pair.Key;
-		UItemData* ItemData = Pair.Value;
-
-		if (!ItemData)
-		{
-			UE_LOG(LogTemp, Error, TEXT("UEquipmentSystem::BeginPlay - ItemData is NULL"));
-			continue;
-		}
-		FEquipmentSlot EquipmentSlot;
-		EquipmentSlot.ItemData = ItemData;
-		EquipmentSlot.EquipmentClass = ItemData->EquipmentClass;
-		EquipmentSlot.Slot = Slot;
-		
-		Equipped.Add(Slot, EquipmentSlot);
-		UE_LOG(LogTemp, Log, TEXT("[EquipmentSystem] Initialized slot %d with %s"),
-			  (int32)Slot, *ItemData->ItemName.ToString());
-	}
 }
 
 void UEquipmentSystem::EquipWeapon(FName SocketName, EEquipmentSlot WeaponSlot)

@@ -6,6 +6,7 @@
 #include "Gameplay/Characters/Player_Base.h"
 //#include "Gameplay/Items/Equipments/WeaponFireCameraShake.h"
 #include "Gameplay/Data/WeaponData.h"
+#include "Gameplay/Characters/FFCharacter.h"
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
@@ -286,6 +287,24 @@ void AMasterWeapon::RandPointInCircle(float Radius, float& PointX, float& PointY
     PointY = DistanceFromCenter * FMath::Sin(FMath::DegreesToRadians(Angle));
 }
 
+void AMasterWeapon::SetOwningCharacter(AFFCharacter* ToSetCharacter)
+{
+    if (WeaponSystem)
+    {
+        WeaponSystem->CharacterRef = ToSetCharacter;
+    }
+}
+
+float AMasterWeapon::GetMaxAmmo() const
+{
+    return WeaponSystem->Weapon_Details.Weapon_Data.MaxAmmo;
+}
+
+float AMasterWeapon::GetCurrentAmmo() const
+{
+    return WeaponSystem->Weapon_Details.Weapon_Data.CurrentAmmo;
+}
+
 bool AMasterWeapon::ApplyHit(const FHitResult HitResult, bool& ValidHit)
 {
     AActor* HitActor = HitResult.GetActor();
@@ -360,19 +379,32 @@ bool AMasterWeapon::PerformCameraTrace(APlayerCameraManager* CameraManager, FHit
 {
     if (!CameraManager || !WeaponData)
         return false;
+    APlayer_Base* Player = Cast<APlayer_Base>(WeaponSystem->CharacterRef);
+    if (!Player)
+        return false;
 
-    UCameraComponent* Cam = WeaponSystem->CharacterRef->FindComponentByClass<UCameraComponent>();
-    if (!Cam)
+    APlayerCameraManager* PCM = Player->GetPlayerCameraManager();
+    if (!PCM)
         return false;
     
-    FVector StartLocation = Cam->GetComponentLocation();
-    FVector ForwardVector = Cam->GetForwardVector();
+    FVector StartLocation = PCM->GetCameraLocation();
+    FVector ForwardVector = PCM->GetActorForwardVector();
     FVector EndLocation = StartLocation + (ForwardVector * WeaponData->MaxRange);
     UE_LOG(LogTemp, Warning, TEXT("[PerformCameraTrace] StartLocation: %s, ForwardVector: %s, EndLocation: %s"),
                 *StartLocation.ToString(), *ForwardVector.ToString(), *EndLocation.ToString());
     FCollisionQueryParams QueryParams;
     QueryParams.AddIgnoredActor(this);
 
+    // DrawDebugLine(
+    //     GetWorld(),           // 월드
+    //     StartLocation,        // 시작점
+    //     EndLocation,          // 끝점
+    //     FColor::Green,       // 라인 색상
+    //     false,               // 지속적으로 그릴지 여부
+    //     5.0f,                // 지속 시간 (초)
+    //     0,                   // 우선순위
+    //     2.0f                 // 두께
+    // );
     return GetWorld()->LineTraceSingleByChannel(
         OutHitResult,
         StartLocation,
@@ -386,7 +418,8 @@ void AMasterWeapon::ExecuteFireSequence(const FHitResult& CameraHitResult)
 {
     FVector MuzzleLocation = WeaponMesh->GetSocketLocation(FName("Muzzle"));
     FVector DirectionToTarget = MuzzleLocation - CameraHitResult.Location;
-    
+    GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow,
+        FString::Printf(TEXT("Hit Actor: %s"), CameraHitResult.GetActor() ? *CameraHitResult.GetActor()->GetName() : TEXT("NULL")));
     // Perform muzzle trace
     FCollisionQueryParams QueryParams;
     QueryParams.AddIgnoredActor(this);
@@ -406,7 +439,7 @@ void AMasterWeapon::ExecuteFireSequence(const FHitResult& CameraHitResult)
         MuzzleHitResult,
         MuzzleLocation,
         MuzzleLocation + (DirectionToTarget * -500.0f),
-        COLLISION_BULLET,
+        ECollisionChannel::ECC_Visibility,
         QueryParams
     );
 
@@ -428,10 +461,6 @@ void AMasterWeapon::Fire()
         UE_LOG(LogTemp, Error, TEXT("[Fire] WeaponSystem or WeaponData is NULL!"));
         return;
     }
-
-    UE_LOG(LogTemp, Log, TEXT("[Fire] Called - CurrentAmmo: %d, AmmoCount: %d"),
-        WeaponSystem->Weapon_Details.Weapon_Data.CurrentAmmo,
-        WeaponSystem->Weapon_Details.Weapon_Data.Ammo_Count);
 
     // Check if we have ammo
     if (!WeaponSystem->FireCheck(WeaponSystem->Weapon_Details.Weapon_Data.Ammo_Count))
@@ -501,7 +530,6 @@ void AMasterWeapon::Reload()
     }
 
     WeaponSystem->ReloadCheck();
-
     FTimerHandle ReloadTimerHandle;
     GetWorld()->GetTimerManager().SetTimer(
         ReloadTimerHandle,

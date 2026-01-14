@@ -8,6 +8,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Components/SceneComponent.h"
 #include "Perception/AISense_Hearing.h"
+#include "NiagaraSystem.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
 
 // Sets default values for this component's properties
 UWeaponSystem::UWeaponSystem()

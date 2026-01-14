@@ -6,6 +6,7 @@
 #include "Gameplay/Items/Equipments/EquipmentBase.h"
 #include "MasterWeapon.generated.h"
 
+class AFFCharacter;
 class AInteraction;
 class UWeaponData;
 class UWeaponSystem;
@@ -75,4 +76,11 @@ private:
 	void FireBlankTracer();
 
 	void RandPointInCircle(float Radius, float& PointX, float& PointY);
+
+public:
+	void SetOwningCharacter(AFFCharacter* ToSetCharacter);
+
+	float GetMaxAmmo() const;
+
+	float GetCurrentAmmo() const;
 };

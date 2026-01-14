@@ -9,6 +9,7 @@
 #include "Gameplay/Components/Hurtbox.h"
 #include "Gameplay/Items/EquipmentSystem.h"
 #include "Gameplay/Items/InventorySystem.h"
+#include "Gameplay/Items/Equipments/MasterWeapon.h"
 
 // Sets default values
 AFFCharacter::AFFCharacter()
@@ -18,6 +19,8 @@ AFFCharacter::AFFCharacter()
 
 	Primary = CreateDefaultSubobject<USceneComponent>("Primary");
 	Handgun = CreateDefaultSubobject<USceneComponent>("Handgun");
+	PrimaryChild = CreateDefaultSubobject<UChildActorComponent>("PrimaryChild");
+	HandgunChild = CreateDefaultSubobject<UChildActorComponent>("HandgunChild");
 	EquipmentSystem = CreateDefaultSubobject<UEquipmentSystem>("EquipmentSystem");
 	InventorySystem = CreateDefaultSubobject<UInventorySystem>("InventorySystem");
 	HealthComponent = CreateDefaultSubobject<UHealthSystem>("HealthComponent");
@@ -26,11 +29,58 @@ AFFCharacter::AFFCharacter()
 
 	Primary->SetupAttachment(RootComponent);
 	Handgun->SetupAttachment(RootComponent);
-	// PrimaryChild->SetupAttachment(Primary);
-	// HandgunChild->SetupAttachment(Handgun);
+	PrimaryChild->SetupAttachment(Primary);
+	HandgunChild->SetupAttachment(Handgun);
 	FlashlightChild->SetupAttachment(RootComponent);
 	EquippedChilds.Add(EEquipmentSlot::Primary, PrimaryChild);
 	EquippedChilds.Add(EEquipmentSlot::Handgun, HandgunChild);
+}
+
+void AFFCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	if (EquipmentSystem)
+	{
+		EquipmentSystem->CharacterRef = this;
+	}
+	// TODO: if (InventorySystem)
+	// {
+	// 	InventorySystem->CharacterRef = this;
+	// }
+
+	if (HealthComponent)
+	{
+		HealthComponent->CharacterRef = this;
+	}
+	if (Hurtbox)
+	{
+		Hurtbox->CharacterRef = this;
+	}
+	
+	if (EquipmentSystem)
+	{
+		for (auto& DefaultEquip : EquipmentSystem->DefaultEquipments)
+		{
+			EEquipmentSlot Slot = DefaultEquip.Key;
+			UItemData* ItemData = DefaultEquip.Value;
+			if (ItemData)
+			{
+				EquipmentSystem->Equip(Slot, ItemData);
+			}
+		}
+	}
+}
+
+void AFFCharacter::SwitchWeapon(EEquipmentSlot Slot)
+{
+}
+
+void AFFCharacter::SwitchToPrimaryWeapon()
+{
+}
+
+void AFFCharacter::SwitchToHandgunWeapon()
+{
 }
 
 void AFFCharacter::FlashOnOff()

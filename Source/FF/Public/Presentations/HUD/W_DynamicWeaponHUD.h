@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "W_DynamicWeaponHUD.generated.h"
 
+class APlayer_Base;
 /**
  * BlueprintImplementableEvent 함수 선언 시 주의사항:
  * 1. FString 타입의 매개변수는 반드시 const reference로 선언해야 함 (const FString&)
@@ -26,4 +27,8 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Weapon", meta = (DisplayName = "ParseAmmoCount"))
 	FString ParseAmmoCount(int32 AmmoCount);
+
+public:
+	UPROPERTY(BlueprintReadWrite, Category = "Player")
+	APlayer_Base* CharacterRef;
 };

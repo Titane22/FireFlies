@@ -63,10 +63,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	bool GetEquipmentSlot(EEquipmentSlot Slot, FEquipmentSlot& OutEquipSlot);
 
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	void SetChildActorForSlot(EEquipmentSlot Slot, UChildActorComponent* ChildActor);
 
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	UChildActorComponent* GetChildActorForSlot(EEquipmentSlot Slot);
 
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
@@ -94,7 +94,7 @@ public:
 	EEquipmentSlot CurrentEquippedSlot;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment|Default")
-	TMap<EEquipmentSlot, UWeaponData*> DefaultEquipments;
+	TMap<EEquipmentSlot, UItemData*> DefaultEquipments;
 
 	TMap<EEquipmentSlot, UChildActorComponent*> SlotToChildActor;
 	

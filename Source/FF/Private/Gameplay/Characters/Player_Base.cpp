@@ -2,8 +2,15 @@
 
 
 #include "Gameplay/Characters/Player_Base.h"
+#include "Gameplay/Items/Equipments/MasterWeapon.h"
+#include "Gameplay/Items/EquipmentSystem.h"
+#include "Gameplay/Items/InventorySystem.h"
+#include "Gameplay/Data/WeaponData.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "Gameplay/Characters/PC_Base.h"
+#include "Presentations/HUD/PlayerHUD.h"
+#include "Presentations/HUD/W_DynamicWeaponHUD.h"
 
 void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
@@ -19,9 +26,11 @@ void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputC
 
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		/*EnhancedInputComponent->BindAction(SwitchWeaponsAction, ETriggerEvent::Triggered, this, &AFFCharacter::SwitchWeapons);
-		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &AFFCharacter::Reload);
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &AFFCharacter::ShootFire);*/
+		// EnhancedInputComponent->BindAction(SwitchPrimaryAction, ETriggerEvent::Triggered, this, &APlayer_Base::SwitchToPrimaryWeapon);
+		// EnhancedInputComponent->BindAction(SwitchHandgunAction, ETriggerEvent::Triggered, this, &APlayer_Base::SwitchToHandgunWeapon);
+
+		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &APlayer_Base::Reload);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlayer_Base::ShootFire);
 	}
 }
 
@@ -30,4 +39,264 @@ void APlayer_Base::BeginPlay()
 	Super::BeginPlay();
 
 	FlashlightChild->SetVisibility(false);
+}
+
+void APlayer_Base::SwitchWeapon(EEquipmentSlot Slot)
+{
+	Super::SwitchWeapon(Slot);
+	if (!EquipmentSystem || !CanSwitchWeapon() || EquipmentSystem->CurrentEquippedSlot == Slot)
+		return;
+	if (!EquipmentSystem->IsEquipped(Slot))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("There is no equipped weapon in slot %d"), (int32)Slot);
+		return;
+	}
+
+	bCanSwitchWeapon = false;
+
+	EquipmentSystem->SwitchToWeapon(Slot);
+
+	UChildActorComponent* TargetChildActor = EquipmentSystem->GetChildActorForSlot(Slot);
+	if (TargetChildActor)
+	{
+		if (AMasterWeapon* Weapon = Cast<AMasterWeapon>(TargetChildActor->GetChildActor()))
+		{
+			CurrentWeapon = Weapon;
+		}
+	}
+
+	// Wait for Child Actor to initialize and update UI
+	FTimerHandle TimerHandle;
+	GetWorld()->GetTimerManager().SetTimer(
+		TimerHandle,
+		[this]()
+		{
+			if (CurrentWeapon && CurrentWeapon->WeaponData)
+			{
+				UpdateWeaponUI(CurrentWeapon->WeaponData);
+			}
+		},
+		0.1f,
+		false
+	);
+
+	// Play Animation Montage
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && CurrentWeapon && CurrentWeapon->WeaponData)
+	{
+		UAnimMontage* WeaponEquipMontage = CurrentWeapon->WeaponData->WeaponEquipMontage;
+		
+		if (WeaponEquipMontage)
+		{
+			AnimInstance->Montage_Play(WeaponEquipMontage, 1.0f);
+			
+			FOnMontageEnded CompleteDelegate;
+			CompleteDelegate.BindUObject(this, &APlayer_Base::OnMontageEnded);
+			AnimInstance->Montage_SetEndDelegate(CompleteDelegate, WeaponEquipMontage);
+		}
+		else
+		{
+			bCanSwitchWeapon = true;
+		}
+	}
+	else
+	{
+		bCanSwitchWeapon = true;
+	}
+}
+
+void APlayer_Base::SwitchToPrimaryWeapon()
+{
+	SwitchWeapon(EEquipmentSlot::Primary);
+}
+
+void APlayer_Base::SwitchToHandgunWeapon()
+{
+	SwitchWeapon(EEquipmentSlot::Handgun);
+}
+
+APlayerCameraManager* APlayer_Base::GetPlayerCameraManager() const
+{
+	APC_Base* PC = Cast<APC_Base>(GetController());
+	if (!PC)
+		return nullptr;
+
+	return PC->PlayerCameraManager;
+}
+
+bool APlayer_Base::CanSwitchWeapon()
+{
+	return bCanSwitchWeapon;
+}
+
+void APlayer_Base::UpdateWeaponUI(UWeaponData* WeaponData)
+{
+	if (!IsPlayerControlled() || !WeaponData)
+		return;
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+		return;
+
+	APlayerHUD* PlayerHUD = Cast<APlayerHUD>(PC->GetHUD());
+	if (!PlayerHUD)
+		return;
+
+	AMasterWeapon* Weapon = nullptr;
+	if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Primary)
+	{
+		Weapon = Cast<AMasterWeapon>(PrimaryChild->GetChildActor());
+	}
+	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Handgun)
+	{
+		Weapon = Cast<AMasterWeapon>(HandgunChild->GetChildActor());
+	}
+	else
+	{
+		PlayerHUD->HideWeaponUI();
+		return;
+	}
+
+	if (!Weapon || !Weapon->WeaponSystem)
+	{
+		PlayerHUD->HideWeaponUI();
+		return;
+	}
+	
+	//GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, FString::Printf(TEXT("Called: %s"), *WeaponData->WeaponUITexture->GetName()));
+	
+	CurrentWeaponUI = PlayerHUD->ShowWeaponUI(
+		WeaponData,
+		Weapon->GetMaxAmmo(),
+		Weapon->GetCurrentAmmo());
+
+	CurrentWeaponUI->CharacterRef = this;
+	
+	PlayerHUD->SetWeaponDataOnHUD(
+		WeaponData->WeaponUITexture,
+		WeaponData->ItemName.ToString(),
+		CurrentWeapon->GetMaxAmmo(),
+		CurrentWeapon->GetCurrentAmmo()
+	);
+}
+
+void APlayer_Base::ShootFire(const FInputActionValue& Value)
+{
+	if (!bIsAiming)
+		return;
+	
+	bFiring = Value.Get<bool>();
+	HandleFiring();
+}
+
+void APlayer_Base::Reload()
+{
+	if (!EquipmentSystem)
+		return;
+
+	AMasterWeapon* MasterWeapon = nullptr;
+
+	if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Primary)
+	{
+		MasterWeapon = Cast<AMasterWeapon>(PrimaryChild->GetChildActor());
+	}
+	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Handgun)
+	{
+		MasterWeapon = Cast<AMasterWeapon>(HandgunChild->GetChildActor());
+	}
+	else
+	{
+		return;
+	}
+
+	if (!MasterWeapon)
+		return;
+
+	MasterWeapon->Reload();
+}
+
+bool APlayer_Base::CanFire()
+{
+	bool bCanJumpNow = CanJump();  // 한 번만 호출하고 저장
+	bool bCanShoot = !IsSprint && !bIsDodging && bCanJumpNow && bCanSwitchWeapon;
+	
+	return bCanShoot;
+}
+
+void APlayer_Base::HandleFiring()
+{
+	if (!EquipmentSystem || !bFiring || !bCanFire || !CanFire())
+		return;
+
+	if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Primary)
+	{
+		AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(PrimaryChild->GetChildActor());
+		UWeaponData* CurrentWeaponDataAsset = MasterWeapon->WeaponData;
+		ReadyToFire(MasterWeapon, CurrentWeaponDataAsset);
+	}
+	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Handgun)
+	{
+		AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(HandgunChild->GetChildActor());
+		UWeaponData* CurrentWeaponDataAsset = MasterWeapon->WeaponData;
+		ReadyToFire(MasterWeapon, CurrentWeaponDataAsset);
+	}
+}
+
+void APlayer_Base::ReadyToFire(AMasterWeapon* MasterWeapon, UWeaponData* CurrentWeaponDataAsset)
+{
+	if (!MasterWeapon || !CurrentWeaponDataAsset)
+		return;
+
+	bCanFire = false;
+	MasterWeapon->Fire();
+	
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (PC)
+	{
+		APlayerHUD* PlayerHUD = Cast<APlayerHUD>(PC->GetHUD());
+		if (PlayerHUD)
+		{
+			PlayerHUD->UpdateWeaponAmmo(
+				MasterWeapon->GetMaxAmmo(),
+				MasterWeapon->GetCurrentAmmo());
+		}
+	}
+
+	float FireDelay = CurrentWeaponDataAsset->FireRate;
+	EFireMode CurrentFireMode = CurrentWeaponDataAsset->FireMode;
+	FTimerHandle TimerHandle;
+
+	switch (CurrentFireMode)
+	{
+	case EFireMode::FullAuto:
+		GetWorld()->GetTimerManager().SetTimer(
+			TimerHandle,
+			[this]()
+			{
+				bCanFire = true;
+				HandleFiring();
+			},
+			FireDelay,
+			false
+		);
+		break;
+	default:
+		GetWorld()->GetTimerManager().SetTimer(
+			TimerHandle,
+			[this]()
+			{
+				bCanFire = true;
+			},
+			FireDelay,
+			false
+		);
+		break;
+	}
+}
+
+void APlayer_Base::OnMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (!bInterrupted)
+	{
+		bCanSwitchWeapon = true;
+	}
 }
