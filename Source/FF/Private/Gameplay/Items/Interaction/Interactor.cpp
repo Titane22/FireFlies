@@ -339,15 +339,8 @@ void UInteractor::ExecuteCurrentInteraction()
 
 UInteractionData* UInteractor::GetCurrentInteractionData() const
 {
-	// Legacy support - returns InteractionData if actor provides it
-	if (!CurrentInteractionActor.IsValid())
-		return nullptr;
-
-	AActor* Actor = CurrentInteractionActor.Get();
-	if (!Actor || !Actor->Implements<UInteractable>())
-		return nullptr;
-
-	return IInteractable::Execute_GetInteractionData(Actor);
+	// Legacy - InteractionData is no longer used
+	return nullptr;
 }
 
 EInteractiveType UInteractor::GetCurrentInteractionType() const
