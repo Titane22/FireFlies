@@ -96,11 +96,4 @@ public:
 	 */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
 	AActor* GetInteractableActor();
-
-	/**
-	 * 상호작용 데이터 가져오기 (선택사항, 레거시 호환용)
-	 * @return 상호작용 데이터 (없으면 nullptr)
-	 */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
-	UInteractionData* GetInteractionData() const;
 };
