@@ -8,43 +8,40 @@
 
 /*
  * 루트 컨테이너
- * 
+ * AInteraction을 상속하여 InteractionData 기반의 상호작용 기능을 제공
  */
-
 
 class ULootingSystem;
 class UInventorySystem;
-struct FLootItemEntry;
-class ULootTableData;
 
 UCLASS()
 class FF_API ALootContainer : public AInteraction
 {
 	GENERATED_BODY()
-	
-public:	
-	// Sets default values for this actor's properties
+
+public:
 	ALootContainer();
 
-	virtual bool CanInteract_Implementation(AController* InstigatorRef) const;
-
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	UFUNCTION()
-	void OnLootOpened(AInteraction* Interaction, const FInteractionContext& Context);
+public:
+	//==============================================================================
+	// IInteractable Interface Override (컨테이너 전용 로직)
+	//==============================================================================
 
-	UFUNCTION(BlueprintCallable, Category = "Looting|UI")
-	void OpenLootingUI(APlayerController* PC); // TODO: Custom Player Controller로 변경
+	virtual FInteractionResult ExecuteInteraction_Implementation(const FInteractionContext& Context) override;
+
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* BaseMesh = nullptr;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UInventorySystem* InventorySystem = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	ULootingSystem* LootingSystem = nullptr;
-	
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Container")
+	bool bGenerateLootOnFirstOpen = true;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Container")
+	bool bHasGeneratedLoot = false;
 };

@@ -12,7 +12,8 @@
 #include "EnhancedInputSubsystems.h"
 #include "Gameplay/Characters/PC_Base.h"
 #include "Presentations/HUD/PlayerHUD.h"
-#include "Presentations/HUD/W_DynamicWeaponHUD.h"
+#include "Presentations/HUD/W_MasterHUD.h"
+#include "GameplayTagContainer.h"
 
 void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
@@ -33,6 +34,7 @@ void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputC
 
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &APlayer_Base::Reload);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlayer_Base::ShootFire);
+		EnhancedInputComponent->BindAction(InventoryAction, ETriggerEvent::Triggered, this, &APlayer_Base::Inventory);
 
 		// Interact actions - Hold support
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &APlayer_Base::Interact_Started);
@@ -135,6 +137,14 @@ bool APlayer_Base::CanSwitchWeapon()
 	return bCanSwitchWeapon;
 }
 
+void APlayer_Base::OpenLootingUI(UInventorySystem* ContainerInven)
+{
+	if (APC_Base* PC_Base = Cast<APC_Base>(GetController()))
+	{
+		PC_Base->LootingInteract(ContainerInven);
+	}
+}
+
 void APlayer_Base::UpdateWeaponUI(UWeaponData* WeaponData)
 {
 	if (!IsPlayerControlled() || !WeaponData)
@@ -167,16 +177,17 @@ void APlayer_Base::UpdateWeaponUI(UWeaponData* WeaponData)
 		PlayerHUD->HideWeaponUI();
 		return;
 	}
-	
-	//GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, FString::Printf(TEXT("Called: %s"), *WeaponData->WeaponUITexture->GetName()));
-	
-	CurrentWeaponUI = PlayerHUD->ShowWeaponUI(
+
+	MasterHUD = PlayerHUD->ShowWeaponUI(
 		WeaponData,
 		Weapon->GetMaxAmmo(),
 		Weapon->GetCurrentAmmo());
 
-	CurrentWeaponUI->CharacterRef = this;
-	
+	if (MasterHUD)
+	{
+		MasterHUD->CharacterRef = this;
+	}
+
 	PlayerHUD->SetWeaponDataOnHUD(
 		WeaponData->WeaponUITexture,
 		WeaponData->ItemName.ToString(),
@@ -312,34 +323,254 @@ void APlayer_Base::Interact_Started()
 	// Reset hold flag when starting interaction
 	bInteractHoldTriggered = false;
 
-	// Record the start time for hold detection
-	InteractStartTime = GetWorld()->GetTimeSeconds();
+	// Check if there's an active interaction
+	if (!Interactor || !Interactor->HasActiveInteraction())
+		return;
 
-	// Start timer for hold detection
-	GetWorld()->GetTimerManager().SetTimer(
-		InteractHoldTimerHandle,
-		this,
-		&APlayer_Base::OnInteractHoldCompleted,
-		HoldThreshold,
-		false
-	);
+	AActor* InteractionActor = Interactor->GetCurrentInteractionActor();
+	if (!InteractionActor || !InteractionActor->Implements<UInteractable>())
+		return;
+	// TODO: 상호작용 타입에 따라 무조건 홀드인지 체크
+	// Check if this is a hold interaction
+	bool bIsHoldInteraction = IInteractable::Execute_IsHoldInteraction(InteractionActor);
+	bool bNeedsHoldUI = bIsHoldInteraction;
+	if (IInteractable::Execute_GetInteractionType(InteractionActor) == EInteractiveType::Container)
+	{
+		// Get hold duration from interactable
+		CurrentInteractionHoldDuration = IInteractable::Execute_GetHoldDuration(InteractionActor);
+		if (CurrentInteractionHoldDuration <= 0.0f)
+		{
+			CurrentInteractionHoldDuration = HoldThreshold;
+		}
 
-	UE_LOG(LogTemp, Log, TEXT("Interact_Started - Timer started for %.2f seconds"), HoldThreshold);
+		// Record the start time for hold detection
+		InteractStartTime = GetWorld()->GetTimeSeconds();
+
+		// Start timer for hold detection
+		GetWorld()->GetTimerManager().SetTimer(
+			InteractHoldTimerHandle,
+			this,
+			&APlayer_Base::OnInteractHoldCompleted,
+			CurrentInteractionHoldDuration,
+			false
+		);
+
+		// Start interaction UI
+		APlayerController* PC = Cast<APlayerController>(GetController());
+		if (PC)
+		{
+			APlayerHUD* PlayerHUD = Cast<APlayerHUD>(PC->GetHUD());
+			if (PlayerHUD)
+			{
+				FText PromptText = IInteractable::Execute_GetInteractionPrompt(InteractionActor);
+				PlayerHUD->StartInteractionUI(PromptText);
+
+				// Start UI update timer (60 FPS)
+				GetWorld()->GetTimerManager().SetTimer(
+					InteractionUIUpdateHandle,
+					this,
+					&APlayer_Base::UpdateInteractionUIProgress,
+					1.0f / 60.0f,
+					true
+				);
+			}
+		}
+
+		UE_LOG(LogTemp, Log, TEXT("Interact_Started - HOLD interaction started for %.2f seconds"), CurrentInteractionHoldDuration);
+	}
+	else if (IInteractable::Execute_GetInteractionType(InteractionActor) == EInteractiveType::Pickup)
+	{
+		// Slot empty or non-hold interaction - execute immediately
+		AController* Ctrl = GetController();
+		if (!Ctrl)
+			return;
+
+		FInteractionContext Context;
+		Context.InstigatorRef = Ctrl;
+		Context.InstigatorPawn = this;
+
+		FInteractionResult Result = IInteractable::Execute_ExecuteInteraction(InteractionActor, Context);
+
+		if (Result.bSuccess)
+		{
+			UE_LOG(LogTemp, Log, TEXT("Immediate interaction succeeded (slot empty or non-hold)"));
+		}
+
+		Interactor->StopCurrentInteraction();
+	}
+	else if (IInteractable::Execute_GetInteractionType(InteractionActor) == EInteractiveType::WeaponPickup)
+	{
+		// For weapons, check if the target slot is occupied
+		// If slot is empty, execute immediately without hold/UI
+		AMasterWeapon* WeaponActor = Cast<AMasterWeapon>(InteractionActor);
+		if (WeaponActor && WeaponActor->WeaponData && EquipmentSystem)
+		{
+			EEquipmentSlot TargetSlot = WeaponActor->WeaponData->ValidSlot;
+			bool bSlotOccupied = EquipmentSystem->IsEquipped(TargetSlot);
+
+			if (!bSlotOccupied)
+			{
+				// Slot is empty - equip directly without hold/UI
+				bNeedsHoldUI = false;
+			}
+		}
+
+		if (bNeedsHoldUI)
+		{
+			// Get hold duration from interactable
+			CurrentInteractionHoldDuration = IInteractable::Execute_GetHoldDuration(InteractionActor);
+			if (CurrentInteractionHoldDuration <= 0.0f)
+			{
+				CurrentInteractionHoldDuration = HoldThreshold;
+			}
+
+			// Record the start time for hold detection
+			InteractStartTime = GetWorld()->GetTimeSeconds();
+
+			// Start timer for hold detection
+			GetWorld()->GetTimerManager().SetTimer(
+				InteractHoldTimerHandle,
+				this,
+				&APlayer_Base::OnInteractHoldCompleted,
+				CurrentInteractionHoldDuration,
+				false
+			);
+
+			// Start interaction UI
+			APlayerController* PC = Cast<APlayerController>(GetController());
+			if (PC)
+			{
+				APlayerHUD* PlayerHUD = Cast<APlayerHUD>(PC->GetHUD());
+				if (PlayerHUD)
+				{
+					FText PromptText = IInteractable::Execute_GetInteractionPrompt(InteractionActor);
+					PlayerHUD->StartInteractionUI(PromptText);
+
+					// Start UI update timer (60 FPS)
+					GetWorld()->GetTimerManager().SetTimer(
+						InteractionUIUpdateHandle,
+						this,
+						&APlayer_Base::UpdateInteractionUIProgress,
+						1.0f / 60.0f,
+						true
+					);
+				}
+			}
+
+			UE_LOG(LogTemp, Log, TEXT("Interact_Started - HOLD interaction started for %.2f seconds"), CurrentInteractionHoldDuration);
+		}
+		else
+		{
+			// Slot empty or non-hold interaction - execute immediately
+			AController* Ctrl = GetController();
+			if (!Ctrl)
+				return;
+
+			FInteractionContext Context;
+			Context.InstigatorRef = Ctrl;
+			Context.InstigatorPawn = this;
+
+			FInteractionResult Result = IInteractable::Execute_ExecuteInteraction(InteractionActor, Context);
+
+			if (Result.bSuccess)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Immediate interaction succeeded (slot empty or non-hold)"));
+			}
+
+			Interactor->StopCurrentInteraction();
+		}
+	}
+	
 }
 
-void APlayer_Base::Interact_Triggered()
+void APlayer_Base::Interact_Completed()
 {
-	// This event is triggered by Enhanced Input when Hold Trigger is configured in Blueprint
-	// We're not using this anymore - using manual time check in Interact_Completed instead
-	// Keep this for compatibility if Hold Trigger is configured in Blueprint
+	// Button released - cancel timer if still running
+	if (GetWorld()->GetTimerManager().IsTimerActive(InteractHoldTimerHandle))
+	{
+		// Timer still active = button released before hold completed = CANCELLED
+		GetWorld()->GetTimerManager().ClearTimer(InteractHoldTimerHandle);
+		GetWorld()->GetTimerManager().ClearTimer(InteractionUIUpdateHandle);
 
-	UE_LOG(LogTemp, Log, TEXT("Interact_Triggered - (Not used - using manual time check)"));
+		// Cancel interaction UI
+		APlayerController* PlayerPC = Cast<APlayerController>(GetController());
+		if (PlayerPC)
+		{
+			APlayerHUD* PlayerHUD = Cast<APlayerHUD>(PlayerPC->GetHUD());
+			if (PlayerHUD)
+			{
+				PlayerHUD->CancelInteractionUI();
+			}
+		}
+
+		UE_LOG(LogTemp, Log, TEXT("Interact_Completed - HOLD cancelled, interaction cancelled"));
+
+		// Check if there's an active interaction
+		if (!Interactor)
+			return;
+
+		if (!Interactor->HasActiveInteraction())
+			return;
+
+		AActor* InteractionActor = Interactor->GetCurrentInteractionActor();
+		if (!InteractionActor || !InteractionActor->Implements<UInteractable>())
+			return;
+
+		AController* Ctrl = GetController();
+		if (!Ctrl)
+			return;
+
+		FInteractionContext Context;
+		Context.InstigatorRef = Ctrl;
+		Context.InstigatorPawn = this;
+
+		// CANCELLED - notify interactable
+		IInteractable::Execute_OnInteractionCancelled(InteractionActor, Context);
+
+		Interactor->StopCurrentInteraction();
+	}
+	else
+	{
+		// Timer already finished = hold was completed
+		UE_LOG(LogTemp, Log, TEXT("Interact_Completed - After HOLD (already handled)"));
+	}
+}
+
+void APlayer_Base::UpdateInteractionUIProgress()
+{
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+	float ElapsedTime = CurrentTime - InteractStartTime;
+	float Progress = FMath::Clamp(ElapsedTime / CurrentInteractionHoldDuration, 0.0f, 1.0f);
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (PC)
+	{
+		APlayerHUD* PlayerHUD = Cast<APlayerHUD>(PC->GetHUD());
+		if (PlayerHUD)
+		{
+			PlayerHUD->UpdateInteractionUI(Progress);
+		}
+	}
 }
 
 void APlayer_Base::OnInteractHoldCompleted()
 {
 	// Timer completed - this is a HOLD
 	bInteractHoldTriggered = true;
+
+	// Stop UI update timer
+	GetWorld()->GetTimerManager().ClearTimer(InteractionUIUpdateHandle);
+
+	// Complete interaction UI
+	APlayerController* PlayerPC = Cast<APlayerController>(GetController());
+	if (PlayerPC)
+	{
+		APlayerHUD* PlayerHUD = Cast<APlayerHUD>(PlayerPC->GetHUD());
+		if (PlayerHUD)
+		{
+			PlayerHUD->CompleteInteractionUI();
+		}
+	}
 
 	UE_LOG(LogTemp, Log, TEXT("OnInteractHoldCompleted - HOLD timer finished, executing swap"));
 
@@ -353,13 +584,13 @@ void APlayer_Base::OnInteractHoldCompleted()
 	AActor* InteractionActor = Interactor->GetCurrentInteractionActor();
 	if (!InteractionActor || !InteractionActor->Implements<UInteractable>())
 		return;
-
-	AController* PC = GetController();
-	if (!PC)
+	
+	AController* Ctrl = GetController();
+	if (!Ctrl)
 		return;
 
 	FInteractionContext Context;
-	Context.InstigatorRef = PC;
+	Context.InstigatorRef = Ctrl;
 	Context.InstigatorPawn = this;
 
 	// HOLD - Execute interaction (swap weapon)
@@ -377,51 +608,62 @@ void APlayer_Base::OnInteractHoldCompleted()
 	Interactor->StopCurrentInteraction();
 }
 
-void APlayer_Base::Interact_Completed()
-{
-	// Button released - cancel timer if still running
-	if (GetWorld()->GetTimerManager().IsTimerActive(InteractHoldTimerHandle))
-	{
-		// Timer still active = button released before hold completed = SHORT PRESS
-		GetWorld()->GetTimerManager().ClearTimer(InteractHoldTimerHandle);
-
-		UE_LOG(LogTemp, Log, TEXT("Interact_Completed - SHORT PRESS detected, adding to inventory"));
-
-		// Check if there's an active interaction
-		if (!Interactor)
-			return;
-
-		if (!Interactor->HasActiveInteraction())
-			return;
-
-		AActor* InteractionActor = Interactor->GetCurrentInteractionActor();
-		if (!InteractionActor || !InteractionActor->Implements<UInteractable>())
-			return;
-
-		AController* PC = GetController();
-		if (!PC)
-			return;
-
-		FInteractionContext Context;
-		Context.InstigatorRef = PC;
-		Context.InstigatorPawn = this;
-
-		// SHORT PRESS - Add to inventory or equip
-		IInteractable::Execute_OnInteractionCancelled(InteractionActor, Context);
-
-		Interactor->StopCurrentInteraction();
-	}
-	else
-	{
-		// Timer already finished = hold was completed
-		UE_LOG(LogTemp, Log, TEXT("Interact_Completed - After HOLD (already handled)"));
-	}
-}
-
 void APlayer_Base::Interact()
 {
 	// Legacy - direct call support
 	Interact_Started();
-	Interact_Triggered();
 	Interact_Completed();
+}
+
+void APlayer_Base::Inventory()
+{
+	APC_Base* PC = Cast<APC_Base>(GetController());
+	if (!PC || !OpenInventoryAnimMontage || !CloseInventoryAnimMontage)
+		return;
+	
+	if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
+	{
+		if (PC->IsVisibleWidget())
+		{
+			AnimInst->Montage_Play(CloseInventoryAnimMontage, 0.75f);
+
+			FOnMontageEnded CompleteDelegate;
+			CompleteDelegate.BindUObject(this, &APlayer_Base::OnCloseMontageEnded);
+			AnimInst->Montage_SetEndDelegate(CompleteDelegate, CloseInventoryAnimMontage);
+		}
+		else
+		{
+			AnimInst->Montage_Play(OpenInventoryAnimMontage, 0.75f);
+			
+			// Activate Inventory Input Mode
+			FGameplayTag InventoryModeTag = FGameplayTag::RequestGameplayTag(FName("EnhancedInput.Modes.Inventory"));
+			PC->AddInputModeTag(InventoryModeTag);
+			PC->SetIgnoreInput(true);
+			
+			FOnMontageEnded CompleteDelegate;
+			CompleteDelegate.BindUObject(this, &APlayer_Base::OnOpenMontageEnded);
+			AnimInst->Montage_SetEndDelegate(CompleteDelegate, OpenInventoryAnimMontage);
+		}
+	}
+}
+	
+
+void APlayer_Base::OnOpenMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{ 
+	if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
+	{
+		AnimInst->Montage_JumpToSection("Idle", Montage);
+	}
+}
+
+void APlayer_Base::OnCloseMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	APC_Base* PC = Cast<APC_Base>(GetController());
+	if (!PC)
+		return;
+	
+	// Activate Inventory Input Mode
+	FGameplayTag InventoryModeTag = FGameplayTag::RequestGameplayTag(FName("EnhancedInput.Modes.Inventory"));
+	PC->RemoveInputModeTag(InventoryModeTag);
+	PC->SetIgnoreInput(false);
 }

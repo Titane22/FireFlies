@@ -43,7 +43,7 @@ void UEquipmentSystem::BeginPlay()
 	}
 }
 
-void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData)
+void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData, bool bShouldEquipToHand)
 {
 	if (!ItemData || !CharacterRef)
 	{
@@ -71,15 +71,20 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData)
 		TargetChild->SetChildActorClass(EquipSlot.EquipmentClass);
 		TargetChild->CreateChildActor();
 
-		// Disable physics immediately after creation
+		// Disable physics and interaction collision immediately after creation
 		if (AMasterWeapon* Weapon = Cast<AMasterWeapon>(TargetChild->GetChildActor()))
 		{
-			if (Weapon->WeaponMesh)
+			if (Weapon->EquipmentMesh)
 			{
-				Weapon->WeaponMesh->SetSimulatePhysics(false);
-				Weapon->WeaponMesh->SetEnableGravity(false);
-				UE_LOG(LogTemp, Log, TEXT("[Equip] Disabled physics for newly created weapon"));
+				Weapon->EquipmentMesh->SetSimulatePhysics(false);
+				Weapon->EquipmentMesh->SetEnableGravity(false);
 			}
+			// Disable interaction collision when equipped
+			if (Weapon->InteractCollision)
+			{
+				Weapon->InteractCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			}
+			UE_LOG(LogTemp, Log, TEXT("[Equip] Disabled physics and interaction for newly created weapon"));
 		}
 	}
 	// 3. 타겟 Child Actor에 붙이기
@@ -88,13 +93,7 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData)
 		UE_LOG(LogTemp, Warning, TEXT("[Equip] - Character's Mesh is NULL"));
 		return;
 	}
-	// Attach to back (storage state)
-	TargetChild->AttachToComponent(
-		CharacterRef->GetMesh(),
-		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-		ItemData->UnequipSocketName
-	);
-
+	
 	// Set WeaponSystem reference
 	if (AMasterWeapon* Weapon = Cast<AMasterWeapon>(TargetChild->GetChildActor()))
 	{
@@ -104,6 +103,23 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData)
 		}
 		// Note: Physics is automatically ignored when attached to character
 	}
+
+	FName SocketName;
+	if (bShouldEquipToHand)
+	{
+		SocketName = ItemData->EquipSocketName;
+	}
+	else
+	{
+		SocketName = ItemData->UnequipSocketName;
+	}
+	// Attach to back (storage state)
+	TargetChild->AttachToComponent(
+		CharacterRef->GetMesh(),
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+		SocketName
+	);
+
 	Equipped.Emplace(Slot, EquipSlot);
 }
 

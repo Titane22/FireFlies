@@ -17,6 +17,7 @@
 #include "Gameplay/Components/Hurtbox.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Presentations/HUD/W_DynamicWeaponHUD.h"
+#include "Presentations/HUD/W_MasterHUD.h"
 #include "Gameplay/Interfaces/Damageable.h"
 #include "Engine/DamageEvents.h"
 
@@ -27,16 +28,8 @@ AMasterWeapon::AMasterWeapon()
 	PrimaryActorTick.bCanEverTick = true;
 
     // Create Components
-    WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
-    InteractCollision = CreateDefaultSubobject<USphereComponent>(TEXT("InteractCollision"));
     WeaponSystem = CreateDefaultSubobject<UWeaponSystem>(TEXT("WeaponSystem"));
 
-    // Setting up the component hierarchy
-    RootComponent = WeaponMesh;
-    InteractCollision->SetupAttachment(WeaponMesh);
-
-    // Set InteractBox collision preset to Interactable
-    InteractCollision->SetCollisionProfileName(FName("Interactable"));
     bReloading = false;
     bAutoReload = false;
 
@@ -48,11 +41,6 @@ AMasterWeapon::AMasterWeapon()
 void AMasterWeapon::BeginPlay()
 {
     Super::BeginPlay();
-
-    AFFCharacter* OwnerRef = Cast<AFFCharacter>(GetAttachParentActor());
-    if (!OwnerRef)
-        return;
-    WeaponSystem->CharacterRef = OwnerRef;
 
     // WeaponData로부터 탄약 정보 로드
     if (WeaponData)
@@ -72,11 +60,24 @@ void AMasterWeapon::BeginPlay()
         UE_LOG(LogTemp, Warning, TEXT("MasterWeapon::BeginPlay - WeaponData is not assigned! Using default ammo values."));
     }
 
-    // TODO: 월드 스폰시에는 물리 적용 안되나, 드롭시에는 적용
-    WeaponMesh->SetSimulatePhysics(true);
-    WeaponMesh->SetEnableGravity(true);
-    WeaponMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-    WeaponMesh->SetCollisionResponseToAllChannels(ECR_Block);
+    // Default state: Physics OFF, InteractCollision OFF
+    // Physics and interaction are only enabled via SpawnDroppedWeapon or EnableWorldInteraction
+    if (EquipmentMesh)
+    {
+        EquipmentMesh->SetSimulatePhysics(false);
+        EquipmentMesh->SetEnableGravity(false);
+    }
+    if (InteractCollision)
+    {
+        InteractCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
+
+    // Try to get character reference if attached
+    AFFCharacter* OwnerRef = Cast<AFFCharacter>(GetAttachParentActor());
+    if (OwnerRef && WeaponSystem)
+    {
+        WeaponSystem->CharacterRef = OwnerRef;
+    }
 }
 
 void AMasterWeapon::FireBullet(FHitResult Hit, bool bReturnHit)
@@ -93,7 +94,7 @@ void AMasterWeapon::FireBullet(FHitResult Hit, bool bReturnHit)
             return;
         }
         FVector SpreadAdjustedHitLocation = Hit.Location + CameraManager->GetActorRightVector() * PointX + CameraManager->GetActorUpVector() * PointY;
-        FVector MuzzleLocation = WeaponMesh->GetSocketLocation(FName("Muzzle"));
+        FVector MuzzleLocation = EquipmentMesh->GetSocketLocation(FName("Muzzle"));
 
         // BulletDirection represents the direction from the muzzle to the target.
         // Calculate the direction vector of the trajectory 
@@ -202,7 +203,7 @@ void AMasterWeapon::FireBullet(FHitResult Hit, bool bReturnHit)
                 BulletEndLocation = BulletEndLocation - MuzzleLocation;
 
                 FTransform SpawnTransform;
-                SpawnTransform.SetLocation(WeaponMesh->GetSocketLocation(FName("Muzzle")));
+                SpawnTransform.SetLocation(EquipmentMesh->GetSocketLocation(FName("Muzzle")));
                 SpawnTransform.SetRotation(BulletEndLocation.Rotation().Quaternion());
                 SpawnTransform.SetScale3D(FVector(1.0f, 1.0f, 1.0f));
 
@@ -239,7 +240,7 @@ void AMasterWeapon::FireFX()
         return;
     }
 
-    WeaponSystem->FireFX(WeaponData->FireSound, WeaponMesh->GetSocketLocation("Muzzle"), WeaponData->SoundAttenuation, WeaponData->SoundConcurrency);
+    WeaponSystem->FireFX(WeaponData->FireSound, EquipmentMesh->GetSocketLocation("Muzzle"), WeaponData->SoundAttenuation, WeaponData->SoundConcurrency);
 
     if (!WeaponData->MuzzleFlashVFX)
     {
@@ -251,7 +252,7 @@ void AMasterWeapon::FireFX()
 
     WeaponSystem->FireMontage(WeaponData->BodyFireMontage);
 
-    WeaponMesh->PlayAnimation(WeaponData->WeaponFireMontage, false);
+    EquipmentMesh->PlayAnimation(WeaponData->WeaponFireMontage, false);
 }
 
 void AMasterWeapon::FireBlankTracer()
@@ -269,7 +270,7 @@ void AMasterWeapon::FireBlankTracer()
     // Apply camera shake (only for players)
     ApplyCameraShake(PC);
 
-    FVector SocketLocation = WeaponMesh->GetSocketLocation(FName("Muzzle"));
+    FVector SocketLocation = EquipmentMesh->GetSocketLocation(FName("Muzzle"));
     FVector TraceEndLocation = PC->PlayerCameraManager->GetRootComponent()->GetComponentLocation()
         + PC->PlayerCameraManager->GetActorForwardVector() * 20000.0f;
     FVector DirectionVector = TraceEndLocation - SocketLocation;
@@ -339,17 +340,23 @@ AMasterWeapon* AMasterWeapon::SpawnDroppedWeapon(UWorld* World, UWeaponData* Wea
     SpawnedWeapon->WeaponData = WeaponData;
 
     // Enable physics simulation for dropped weapon
-    if (SpawnedWeapon->WeaponMesh)
+    if (SpawnedWeapon->EquipmentMesh)
     {
-        SpawnedWeapon->WeaponMesh->SetSimulatePhysics(true);
-        SpawnedWeapon->WeaponMesh->SetEnableGravity(true);
-        SpawnedWeapon->WeaponMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-        SpawnedWeapon->WeaponMesh->SetCollisionResponseToAllChannels(ECR_Block);
-
-        UE_LOG(LogTemp, Log, TEXT("SpawnDroppedWeapon: Spawned '%s' at %s with physics enabled"),
-            *WeaponData->ItemName.ToString(),
-            *Location.ToString());
+        SpawnedWeapon->EquipmentMesh->SetSimulatePhysics(true);
+        SpawnedWeapon->EquipmentMesh->SetEnableGravity(true);
+        SpawnedWeapon->EquipmentMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+        SpawnedWeapon->EquipmentMesh->SetCollisionResponseToAllChannels(ECR_Block);
     }
+
+    // Enable interaction collision for dropped weapon
+    if (SpawnedWeapon->InteractCollision)
+    {
+        SpawnedWeapon->InteractCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("SpawnDroppedWeapon: Spawned '%s' at %s with physics and interaction enabled"),
+        *WeaponData->ItemName.ToString(),
+        *Location.ToString());
 
     return SpawnedWeapon;
 }
@@ -465,7 +472,7 @@ bool AMasterWeapon::PerformCameraTrace(APlayerCameraManager* CameraManager, FHit
 
 void AMasterWeapon::ExecuteFireSequence(const FHitResult& CameraHitResult)
 {
-    FVector MuzzleLocation = WeaponMesh->GetSocketLocation(FName("Muzzle"));
+    FVector MuzzleLocation = EquipmentMesh->GetSocketLocation(FName("Muzzle"));
     FVector DirectionToTarget = MuzzleLocation - CameraHitResult.Location;
     GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow,
         FString::Printf(TEXT("Hit Actor: %s"), CameraHitResult.GetActor() ? *CameraHitResult.GetActor()->GetName() : TEXT("NULL")));
@@ -573,9 +580,9 @@ void AMasterWeapon::Reload()
         ReloadDelay = WeaponSystem->ReloadMontage(WeaponData->BodyReloadMontage);
     }
 
-    if (WeaponMesh)
+    if (EquipmentMesh)
     {
-        WeaponMesh->PlayAnimation(WeaponData->WeaponReloadMontage, false);
+        EquipmentMesh->PlayAnimation(WeaponData->WeaponReloadMontage, false);
     }
 
     WeaponSystem->ReloadCheck();
@@ -588,10 +595,10 @@ void AMasterWeapon::Reload()
             if (WeaponSystem && WeaponSystem->CharacterRef)
             {
                 APlayer_Base* Player = Cast<APlayer_Base>(WeaponSystem->CharacterRef);
-                if (Player && Player->CurrentWeaponUI)
+                if (Player && Player->MasterHUD)
                 {
                     FWeapon_Details WeaponDetails = WeaponSystem->Weapon_Details;
-                    Player->CurrentWeaponUI->UpdateAmmoCount(
+                    Player->MasterHUD->UpdateAmmoCount(
                         WeaponDetails.Weapon_Data.MaxAmmo,
                         WeaponDetails.Weapon_Data.CurrentAmmo
                     );
@@ -650,6 +657,7 @@ FInteractionResult AMasterWeapon::ExecuteInteraction_Implementation(const FInter
         UE_LOG(LogTemp, Log, TEXT("AMasterWeapon::ExecuteInteraction - Swapping weapons"));
 
         // Unequip current weapon (this will drop it)
+        bool bShouldEquipToHand = EquipmentSys->CurrentEquippedSlot == TargetSlot;
         UWeaponData* DroppedWeaponData = EquipmentSys->Unequip(TargetSlot);
 
         // Spawn dropped weapon actor in world
@@ -675,9 +683,9 @@ FInteractionResult AMasterWeapon::ExecuteInteraction_Implementation(const FInter
                 UE_LOG(LogTemp, Warning, TEXT("Failed to spawn dropped weapon"));
             }
         }
-
+        
         // Equip new weapon
-        EquipmentSys->Equip(TargetSlot, WeaponData);
+        EquipmentSys->Equip(TargetSlot, WeaponData, bShouldEquipToHand);
 
         // Destroy the world weapon actor
         Destroy();
@@ -765,15 +773,16 @@ FText AMasterWeapon::GetInteractionPrompt_Implementation() const
 
 bool AMasterWeapon::IsHoldInteraction_Implementation() const
 {
-    // For now, all interactions are instant
-    // TODO: Implement Hold to swap later
-    return false;
+    // Weapons always use hold interaction system
+    // - Short press (release before hold): add to inventory or equip if slot empty
+    // - Hold complete: swap weapons if slot occupied
+    return true;
 }
 
 float AMasterWeapon::GetHoldDuration_Implementation() const
 {
-    // Hold duration for weapon swap
-    return IsHoldInteraction_Implementation() ? 1.0f : 0.0f;
+    // Hold duration for weapon swap (1 second)
+    return 1.0f;
 }
 
 bool AMasterWeapon::IsSingleUse_Implementation() const
@@ -787,18 +796,18 @@ void AMasterWeapon::SetHighlighted_Implementation(bool bHighlight)
     bIsHighlighted = bHighlight;
 
     // Apply highlight effect to weapon mesh
-    if (WeaponMesh)
+    if (EquipmentMesh)
     {
         if (bHighlight)
         {
             // Enable custom depth for outline effect
-            WeaponMesh->SetRenderCustomDepth(true);
-            WeaponMesh->SetCustomDepthStencilValue(1);
+            EquipmentMesh->SetRenderCustomDepth(true);
+            EquipmentMesh->SetCustomDepthStencilValue(1);
         }
         else
         {
             // Disable custom depth
-            WeaponMesh->SetRenderCustomDepth(false);
+            EquipmentMesh->SetRenderCustomDepth(false);
         }
     }
 }
@@ -870,9 +879,7 @@ AActor* AMasterWeapon::GetInteractableActor_Implementation()
     return this;
 }
 
-UInteractionData* AMasterWeapon::GetInteractionData_Implementation() const
+EInteractiveType AMasterWeapon::GetInteractionType_Implementation() const
 {
-    // Not using InteractionData - using direct interface methods instead
-    return nullptr;
+    return EInteractiveType::WeaponPickup;
 }
-

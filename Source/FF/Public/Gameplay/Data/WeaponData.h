@@ -63,9 +63,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
 	UTexture2D* WeaponUITexture;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
-	TSubclassOf<UW_DynamicWeaponHUD> WeaponUI;
-
 	// Animation	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	FVector LeftHandIKOffset;

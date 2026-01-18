@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Gameplay/Data/InteractionContext.h"
+#include "Gameplay/Interfaces/Interactable.h"
 #include "Interaction.generated.h"
 
 class UInteractionData;
@@ -44,10 +45,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteractionHighlightChanged, bool
 
 /**
  * AInteraction - Data-Driven 상호작용 베이스 클래스
- * 더 이상 자식 클래스를 만들 필요 없이, InteractionData와 Event로 모든 것을 처리
+ * IInteractable 인터페이스의 기본 구현을 제공하며, InteractionData를 통해 설정을 관리
  */
 UCLASS(Blueprintable)
-class FF_API AInteraction : public AActor
+class FF_API AInteraction : public AActor, public IInteractable
 {
 	GENERATED_BODY()
 
@@ -55,29 +56,19 @@ public:
 	AInteraction();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USceneComponent* DefaultSceneRoot = nullptr;
-
 	//==============================================================================
 	// State
 	//==============================================================================
 
 	/** 현재 상호작용이 하이라이트되어 있는지 (플레이어가 보고 있는지) */
-	UPROPERTY(BlueprintReadOnly, Category = "Interaction", Replicated)
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
 	bool bIsHighlighted = false;
 
-	/** 마지막 상호작용 시간 (쿨다운 계산용) */
-	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
-	float LastInteractionTime = 0.0f;
-
-	//==============================================================================
-	// Lifecycle
-	//==============================================================================
-
 	virtual void BeginPlay() override;
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
 public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	USceneComponent* DefaultSceneRoot = nullptr;
 	//==============================================================================
 	// Events (Data-Driven)
 	//==============================================================================
@@ -103,87 +94,18 @@ public:
 	UInteractionData* InteractionData = nullptr;
 
 	//==============================================================================
-	// Weapon State (드롭된 무기용)
+	// IInteractable Interface Implementation
 	//==============================================================================
 
-	/** 드롭된 무기의 탄약 상태 (bHasCustomState가 true일 때만 사용) */
-	UPROPERTY(BlueprintReadWrite, Category = "Weapon")
-	FWeaponAmmoState SavedAmmoState;
-
-	/** 커스텀 탄약 상태를 가지고 있는지 (false면 기본 WeaponData 사용) */
-	UPROPERTY(BlueprintReadWrite, Category = "Weapon")
-	bool bHasCustomState = false;
-
-public:
-	
-	//==============================================================================
-	// Interaction Interface
-	//==============================================================================
-
-	/**
-	 * 상호작용 실행 (자식 클래스에서 오버라이드)
-	 * @param Context - 상호작용 컨텍스트
-	 * @return 상호작용 결과
-	 */
-	UFUNCTION(BlueprintNativeEvent, Category = "Interaction")
-	FInteractionResult ExecuteInteraction(const FInteractionContext& Context);
-	virtual FInteractionResult ExecuteInteraction_Implementation(const FInteractionContext& Context);
-
-	/**
-	 * 상호작용 가능 여부 체크
-	 * @param InstigatorRef - 상호작용을 요청한 컨트롤러
-	 * @return 상호작용 가능 여부
-	 */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
-	bool CanInteract(AController* InstigatorRef) const;
-	virtual bool CanInteract_Implementation(AController* InstigatorRef) const;
-
-	/**
-	 * 하이라이트 상태 설정 (플레이어가 볼 때)
-	 * @param bHighlight - 하이라이트 여부
-	 */
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	virtual void SetHighlighted(bool bHighlight);
-
-	/**
-	 * 상호작용 시작 (Hold 타입용)
-	 * @param Context - 상호작용 컨텍스트
-	 */
-	UFUNCTION(BlueprintNativeEvent, Category = "Interaction")
-	void OnInteractionStarted(const FInteractionContext& Context);
-	virtual void OnInteractionStarted_Implementation(const FInteractionContext& Context);
-
-	/**
-	 * 상호작용 취소 (Hold 타입용)
-	 * @param Context - 상호작용 컨텍스트
-	 */
-	UFUNCTION(BlueprintNativeEvent, Category = "Interaction")
-	void OnInteractionCancelled(const FInteractionContext& Context);
-	virtual void OnInteractionCancelled_Implementation(const FInteractionContext& Context);
-
-	//==============================================================================
-	// Getters
-	//==============================================================================
-
-	UFUNCTION(BlueprintPure, Category = "Interaction")
-	UInteractionData* GetInteractionData() const { return InteractionData; }
-
-	UFUNCTION(BlueprintPure, Category = "Interaction")
-	bool IsHighlighted() const { return bIsHighlighted; }
-
-	/** 쿨다운 중인지 확인 */
-	UFUNCTION(BlueprintPure, Category = "Interaction")
-	bool IsOnCooldown() const;
-
-	/** 남은 쿨다운 시간 */
-	UFUNCTION(BlueprintPure, Category = "Interaction")
-	float GetRemainingCooldown() const;
-
-	//==============================================================================
-	// Deprecated (Backward Compatibility)
-	//==============================================================================
-
-	/** @deprecated Use ExecuteInteraction instead */
-	UE_DEPRECATED(5.0, "Use ExecuteInteraction instead")
-	virtual void Interact(AController* Interactor);
+	virtual FInteractionResult ExecuteInteraction_Implementation(const FInteractionContext& Context) override;
+	virtual bool CanInteract_Implementation(AController* InstigatorRef) const override;
+	virtual FText GetInteractionPrompt_Implementation() const override;
+	virtual bool IsHoldInteraction_Implementation() const override;
+	virtual float GetHoldDuration_Implementation() const override;
+	virtual bool IsSingleUse_Implementation() const override;
+	virtual void SetHighlighted_Implementation(bool bHighlight) override;
+	virtual void OnInteractionStarted_Implementation(const FInteractionContext& Context) override;
+	virtual void OnInteractionCancelled_Implementation(const FInteractionContext& Context) override;
+	virtual AActor* GetInteractableActor_Implementation() override;
+	virtual EInteractiveType GetInteractionType_Implementation() const override;
 };

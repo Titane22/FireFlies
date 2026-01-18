@@ -26,7 +26,6 @@ UWeaponData::UWeaponData()
 
     // UI
     WeaponUITexture = nullptr;
-    WeaponUI = nullptr;
 
     // Animation
     LeftHandIKOffset = FVector::ZeroVector;

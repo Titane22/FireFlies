@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
 #include "Gameplay/Data/InteractionContext.h"
+#include "Gameplay/Library/InteractiveType.h"
 #include "Interactable.generated.h"
 
 class UInteractionData;
@@ -96,4 +97,11 @@ public:
 	 */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
 	AActor* GetInteractableActor();
+
+	/**
+	 * 상호작용 타입 가져오기
+	 * @return 상호작용 타입 (Pickup, WeaponPickup, Container 등)
+	 */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
+	EInteractiveType GetInteractionType() const;
 };

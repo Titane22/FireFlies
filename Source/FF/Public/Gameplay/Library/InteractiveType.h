@@ -12,7 +12,8 @@ enum class EInteractiveType : uint8
 {
 	Default			UMETA(DisplayName = "Default"),
 	Pickup			UMETA(DisplayName = "Pickup"),
-	WeaponPickup	UMETA(DisplayName = "WeaponPickup")
+	WeaponPickup	UMETA(DisplayName = "WeaponPickup"),
+	Container		UMETA(DisplayName = "Container")
 };
 
 /**

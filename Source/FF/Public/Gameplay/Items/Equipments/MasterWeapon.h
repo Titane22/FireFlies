@@ -37,13 +37,7 @@ protected:
 	virtual void BeginPlay() override;
 
 public:	
-	// 컴포넌트들
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USkeletalMeshComponent* WeaponMesh;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USphereComponent* InteractCollision;
-	
+	// 컴포넌트들	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UWeaponSystem* WeaponSystem;
 
@@ -104,7 +98,7 @@ public:
 	virtual void OnInteractionStarted_Implementation(const FInteractionContext& Context) override;
 	virtual void OnInteractionCancelled_Implementation(const FInteractionContext& Context) override;
 	virtual AActor* GetInteractableActor_Implementation() override;
-	virtual UInteractionData* GetInteractionData_Implementation() const override;
+	virtual EInteractiveType GetInteractionType_Implementation() const override;
 
 protected:
 	/** 하이라이트 상태 */

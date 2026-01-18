@@ -32,7 +32,7 @@ public:
 	UEquipmentSystem();
 
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
-	void Equip(EEquipmentSlot Slot, UItemData* ItemData);
+	void Equip(EEquipmentSlot Slot, UItemData* ItemData, bool bShouldEquipToHand = false);
 
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	UWeaponData* Unequip(EEquipmentSlot Slot);
