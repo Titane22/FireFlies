@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
+#include "WeaponAttackSystem.h"
 #include "WeaponSystem.generated.h"
 
 #define COLLISION_BULLET ECollisionChannel::ECC_GameTraceChannel1
@@ -57,7 +57,7 @@ struct FWeapon_Details
 };
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class FF_API UWeaponSystem : public UActorComponent
+class FF_API UWeaponSystem : public UWeaponAttackSystem
 {
 	GENERATED_BODY()
 
