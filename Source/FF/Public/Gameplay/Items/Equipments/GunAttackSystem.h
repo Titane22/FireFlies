@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "WeaponAttackSystem.h"
-#include "WeaponSystem.generated.h"
+#include "GunAttackSystem.generated.h"
 
 #define COLLISION_BULLET ECollisionChannel::ECC_GameTraceChannel1
 
@@ -57,13 +57,24 @@ struct FWeapon_Details
 };
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class FF_API UWeaponSystem : public UWeaponAttackSystem
+class FF_API UGunAttackSystem : public UWeaponAttackSystem
 {
 	GENERATED_BODY()
 
 public:	
 	// Sets default values for this component's properties
-	UWeaponSystem();
+	UGunAttackSystem();
+	
+	virtual void BeginPlay() override;
+	
+	virtual void PerformAttack() override;
+
+	virtual bool CanReload() const override;
+	virtual void ExecuteReload() override;
+	virtual int32 GetCurrentAmmo() const override { return Weapon_Details.Weapon_Data.CurrentAmmo; }
+	virtual int32 GetMaxAmmo() const override { return Weapon_Details.Weapon_Data.MaxAmmo; }
+	
+	void FireBullet(FHitResult Hit, bool bReturnHit);
 
 	bool FireCheck(int32 AmmoCount);
 
@@ -75,19 +86,33 @@ public:
 
 	void FireMontage(UAnimMontage* FireAnim);
 
-	bool CheckAmmo();
+	bool CheckAmmo() const;
 
 	float ReloadMontage(UAnimMontage* ReloadAnim);
 
 	void ReloadCheck();
 	
+	void RandPointInCircle(float Radius, float& PointX, float& PointY);
+	
+	void FireBlankTracer();
+
+	void PlayFireEffect();
+private:
+	// Fire helper functions
+	void ApplyCameraShake(APlayerController* PC);
+	bool PerformCameraTrace(APlayerCameraManager* CameraManager, FHitResult& OutHitResult);
+	void ExecuteFireSequence(const FHitResult& CameraHitResult);
+	
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	USkeletalMesh* WeaponMesh;
-
+	AMasterWeapon* OwnerWeapon;	
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	bool bIsDryAmmo;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	bool bAutoReload;
+	
 	UPROPERTY()
 	FWeapon_Details Weapon_Details = {
 		FWeapon_Data{
@@ -98,8 +123,5 @@ public:
 			/* Ammo_Count */ 1,
 			/* ShortGun_Trace */ false
 		}
-	};
-
-	UPROPERTY()
-	AFFCharacter* CharacterRef;
+	};	
 };

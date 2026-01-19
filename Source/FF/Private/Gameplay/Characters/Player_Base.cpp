@@ -172,7 +172,7 @@ void APlayer_Base::UpdateWeaponUI(UWeaponData* WeaponData)
 		return;
 	}
 
-	if (!Weapon || !Weapon->WeaponSystem)
+	if (!Weapon || !Weapon->AttackSystem)
 	{
 		PlayerHUD->HideWeaponUI();
 		return;
@@ -262,9 +262,9 @@ void APlayer_Base::ReadyToFire(AMasterWeapon* MasterWeapon, UWeaponData* Current
 {
 	if (!MasterWeapon || !CurrentWeaponDataAsset)
 		return;
-
+	// TODO: GunAttackComponent인지 체크
 	bCanFire = false;
-	MasterWeapon->Fire();
+	MasterWeapon->Attack();
 	
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (PC)

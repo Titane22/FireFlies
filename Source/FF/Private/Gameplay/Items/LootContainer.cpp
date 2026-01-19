@@ -38,12 +38,9 @@ FInteractionResult ALootContainer::ExecuteInteraction_Implementation(const FInte
 	// 루팅 UI 열기
 	if (APlayer_Base* Player = Cast<APlayer_Base>(Context.InstigatorPawn))
 	{
-		// Player->OpenLootingUI(InventorySystem);
+		// TODO: 루팅 오브젝트 별 애니메이션 삽입 및 루팅/인벤토리 해제 로직 개선
 		Player->OpenLootingUI(InventorySystem);
 	}
 
-	// 부모 클래스의 이벤트 브로드캐스트 호출
-	Super::ExecuteInteraction_Implementation(Context);
-
-	return FInteractionResult::Success();
+	return Super::ExecuteInteraction_Implementation(Context);
 }

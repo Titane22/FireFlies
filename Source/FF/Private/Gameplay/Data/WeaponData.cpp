@@ -38,3 +38,8 @@ UWeaponData::UWeaponData()
     // Audio
     FireSound = nullptr;
 }
+
+FPrimaryAssetId UWeaponData::GetPrimaryAssetId() const
+{
+    return FPrimaryAssetId("Weapon_C", GetFName());
+}

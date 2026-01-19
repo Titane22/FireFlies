@@ -9,12 +9,21 @@
 class UNiagaraSystem;
 class AMasterWeapon;
 class UW_DynamicWeaponHUD;
+class UWeaponAttackSystem;
 
 UENUM(BlueprintType)
 enum class EWeaponType : uint8
 {
 	Pistol          UMETA(DisplayName = "Pistol"),
 	RifleAndShotgun UMETA(DisplayName = "Rifle/Shotgun")
+};
+
+UENUM(BlueprintType)
+enum class EWeaponAttackType : uint8
+{
+	Hitscan,
+	Projectile,
+	Melee
 };
 
 UENUM(BlueprintType)
@@ -36,10 +45,16 @@ class FF_API UWeaponData : public UItemData
 public:
 	UWeaponData();
 
+	/** AssetManager용 PrimaryAssetId 반환 */
+	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
+	
 	// Weapon Details
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Details")
 	EWeaponType WeaponType;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Details")
+	TSubclassOf<UWeaponAttackSystem> AttackComponentClass;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fire Mode Data")
 	EFireMode FireMode;
 
@@ -53,6 +68,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ballistics")
 	float BulletSpread;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ballistics")
+	EWeaponAttackType AttackType;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ballistics")
 	float Damage;
 

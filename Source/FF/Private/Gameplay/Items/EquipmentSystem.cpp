@@ -3,7 +3,7 @@
 
 #include "Gameplay/Items/EquipmentSystem.h"
 #include "Gameplay/Items/InventorySystem.h"
-#include "Gameplay/Items/Equipments/WeaponSystem.h"
+#include "Gameplay/Items/Equipments/GunAttackSystem.h"
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
 #include "Gameplay/Characters/FFCharacter.h"
 #include "Gameplay/Data/EquipmentTypes.h"
@@ -97,9 +97,9 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData, bool bSho
 	// Set WeaponSystem reference
 	if (AMasterWeapon* Weapon = Cast<AMasterWeapon>(TargetChild->GetChildActor()))
 	{
-		if (Weapon->WeaponSystem)
+		if (Weapon->AttackSystem)
 		{
-			Weapon->WeaponSystem->CharacterRef = CharacterRef;
+			Weapon->AttackSystem->CharacterRef = CharacterRef;
 		}
 		// Note: Physics is automatically ignored when attached to character
 	}
@@ -435,9 +435,9 @@ bool UEquipmentSystem::PickupAndEquipWeapon(TSubclassOf<AMasterWeapon> NewWeapon
 	// SetChildActorClass로 생성된 무기의 CharacterRef 수동 설정
 	if (AMasterWeapon* NewWeapon = Cast<AMasterWeapon>(TargetChild->GetChildActor()))
 	{
-		if (NewWeapon->WeaponSystem)
+		if (NewWeapon->AttackSystem)
 		{
-			NewWeapon->WeaponSystem->CharacterRef = CharacterRef;
+			NewWeapon->AttackSystem->CharacterRef = CharacterRef;
 			UE_LOG(LogTemp, Log, TEXT("PickupAndEquipWeapon: CharacterRef manually set for new weapon"));
 		}
 		// Note: Physics is automatically ignored when attached to character

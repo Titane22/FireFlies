@@ -1,18 +1,15 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Gameplay/Items/LootingSystem.h"
 #include "Gameplay/Items/InventorySystem.h"
-#include "Gameplay/Data/LootTableData.h"
+#include "Gameplay/Data/LootItemRow.h"
+#include "Gameplay/Data/ItemData.h"
+#include "Engine/DataTable.h"
+#include "Engine/AssetManager.h"
 
-// Sets default values for this component's properties
 ULootingSystem::ULootingSystem()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = false;
-
-	// ...
 }
 
 void ULootingSystem::SetInventorySystem(UInventorySystem* IS)
@@ -20,68 +17,113 @@ void ULootingSystem::SetInventorySystem(UInventorySystem* IS)
 	OwnerIS = IS;
 }
 
-// Called when the game starts
 void ULootingSystem::BeginPlay()
 {
 	Super::BeginPlay();
-
 }
 
 void ULootingSystem::GenerateLoot()
 {
-	if (!LootTable || !OwnerIS)
+	if (!LootSettings.LootTable || !OwnerIS)
 	{
-		UE_LOG(LogTemp, Error, TEXT("No Loot Table"));
+		UE_LOG(LogTemp, Warning, TEXT("LootingSystem::GenerateLoot - LootTable or OwnerIS is null"));
 		return;
 	}
 
-	TArray<const FLootItemEntry*> ValidEntries;
-	for (const FLootItemEntry& Entry : LootTable->LootItems)
+	// DataTable에서 유효한 항목 필터링
+	TArray<const FLootItemRow*> ValidEntries;
+
+	const TMap<FName, uint8*>& RowMap = LootSettings.LootTable->GetRowMap();
+	for (const auto& Pair : RowMap)
 	{
-		// 컨테이너 가치 범위와 아이템 가치 범위가 겹치는가?
-		if (Entry.MaxValue >= LootTable->ContainerMinValue &&
-			Entry.MinValue <= LootTable->ContainerMaxValue)
+		const FLootItemRow* Row = reinterpret_cast<const FLootItemRow*>(Pair.Value);
+		if (!Row)
+			continue;
+
+		// 컨테이너 가치 범위와 아이템 가치 범위가 겹치는지 확인
+		if (Row->MaxValue >= LootSettings.ContainerMinValue &&
+			Row->MinValue <= LootSettings.ContainerMaxValue)
 		{
-			ValidEntries.Add(&Entry);
-			UE_LOG(LogTemp, Warning, TEXT("Entry: %s"), *Entry.ItemData->ItemName.ToString());
+			ValidEntries.Add(Row);
 		}
 	}
 
 	if (ValidEntries.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("LootingSystem::GenerateLoot - No valid entries found"));
 		return;
+	}
 
+	// 드롭할 아이템 수 결정
 	int32 DropCount = FMath::RandRange(
-		LootTable->MinDropCount,
-		LootTable->MaxDropCount
+		LootSettings.MinDropCount,
+		LootSettings.MaxDropCount
 	);
+
+	UE_LOG(LogTemp, Log, TEXT("LootingSystem::GenerateLoot - Dropping %d items from %d valid entries"),
+		DropCount, ValidEntries.Num());
+
+	// 아이템 드롭
+	UAssetManager& AssetManager = UAssetManager::Get();
 
 	for (int32 i = 0; i < DropCount; ++i)
 	{
-		const FLootItemEntry* Selected = SelectByWeight(ValidEntries);
-		if (!Selected || !Selected->ItemData)
+		const FLootItemRow* Selected = SelectByWeight(ValidEntries);
+		if (!Selected || !Selected->ItemID.IsValid())
 			continue;
 
-		// TODO: Cacluate Item Quantity
-		OwnerIS->TryAddItemEmptySpot(Selected->ItemData);
-		UE_LOG(LogTemp, Error, TEXT("Selected->ItemData: %s"), *Selected->ItemData->ItemName.ToString());
+		// PrimaryAssetId로 ItemData 로드
+		UItemData* LoadedItemData = Cast<UItemData>(AssetManager.GetPrimaryAssetObject(Selected->ItemID));
+
+		if (!LoadedItemData)
+		{
+			// 동기 로드 시도
+			FSoftObjectPath AssetPath = AssetManager.GetPrimaryAssetPath(Selected->ItemID);
+			LoadedItemData = Cast<UItemData>(AssetPath.TryLoad());
+		}
+
+		if (!LoadedItemData)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("LootingSystem::GenerateLoot - Failed to load ItemData: %s"),
+				*Selected->ItemID.ToString());
+			continue;
+		}
+
+		// 수량 결정
+		int32 Quantity = FMath::RandRange(Selected->MinQuantity, Selected->MaxQuantity);
+
+		// 인벤토리에 추가
+		OwnerIS->TryAddItemEmptySpot(LoadedItemData, Quantity);
+
+		UE_LOG(LogTemp, Log, TEXT("LootingSystem::GenerateLoot - Added %s x%d"),
+			*LoadedItemData->ItemName.ToString(), Quantity);
 	}
 }
 
-const FLootItemEntry* ULootingSystem::SelectByWeight(TArray<const FLootItemEntry*> Entries)
+const FLootItemRow* ULootingSystem::SelectByWeight(const TArray<const FLootItemRow*>& Entries)
 {
+	if (Entries.IsEmpty())
+		return nullptr;
+
+	// 총 가중치 계산
 	float TotalWeight = 0.0f;
-	for (const auto* Entry : Entries)
+	for (const FLootItemRow* Entry : Entries)
 	{
 		TotalWeight += Entry->Weight;
 	}
 
+	if (TotalWeight <= 0.0f)
+		return Entries[0];
+
+	// 랜덤 선택
 	float Rand = FMath::RandRange(0.0f, TotalWeight);
 
-	for (const auto* Entry : Entries)
+	for (const FLootItemRow* Entry : Entries)
 	{
 		Rand -= Entry->Weight;
-		if (Rand <= 0.f)
+		if (Rand <= 0.0f)
 			return Entry;
 	}
-	return nullptr;
+
+	return Entries.Last();
 }

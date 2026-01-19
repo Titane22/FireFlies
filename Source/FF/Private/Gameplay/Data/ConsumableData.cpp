@@ -3,3 +3,16 @@
 
 #include "Gameplay/Data/ConsumableData.h"
 
+UConsumableData::UConsumableData()
+{
+	ItemName = FText::FromString("Consumable");
+	bStackable = true;
+	MaxStackSize = 99;
+
+	
+}
+
+FPrimaryAssetId UConsumableData::GetPrimaryAssetId() const
+{
+	return FPrimaryAssetId("Consumable_C", GetFName());
+}
