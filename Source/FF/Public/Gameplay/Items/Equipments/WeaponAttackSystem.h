@@ -49,7 +49,7 @@ public:
 
 public:
 	UPROPERTY()
-	AFFCharacter* CharacterRef;
+	AFFCharacter* CharacterRef = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
 	bool bReloading = false;

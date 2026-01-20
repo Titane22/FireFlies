@@ -37,7 +37,8 @@ void AMasterWeapon::BeginPlay()
     {
         AttackSystem = NewObject<UWeaponAttackSystem>(
             this,
-            WeaponData->AttackComponentClass
+            WeaponData->AttackComponentClass,
+            TEXT("Attack System")
         );
         AttackSystem->RegisterComponent();
     }
@@ -46,7 +47,6 @@ void AMasterWeapon::BeginPlay()
         UE_LOG(LogTemp, Error, TEXT("MasterWeapon::BeginPlay - WeaponData or AttackComponentClass is NULL!"));                                                                                                                    
         return;  
     }
-    
     
     // Default state: Physics OFF, InteractCollision OFF
     // Physics and interaction are only enabled via SpawnDroppedWeapon or EnableWorldInteraction

@@ -54,7 +54,6 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData, bool bSho
 	EquipSlot.ItemData = ItemData;
 	EquipSlot.EquipmentClass = ItemData->EquipmentClass;
 	EquipSlot.Slot = Slot;
-	
 	// 1. 타겟 Child Actor 찾기
 	UChildActorComponent** TargetChildPtr = CharacterRef->EquippedChilds.Find(Slot);
 	if (!TargetChildPtr || !*TargetChildPtr)
@@ -66,11 +65,19 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData, bool bSho
 	UChildActorComponent* TargetChild = *TargetChildPtr;
 	// 2. 타겟 Child Actor에 등록하기
 	SetChildActorForSlot(Slot, TargetChild);
+
 	if (!TargetChild->GetChildActor() && EquipSlot.EquipmentClass)
 	{
 		TargetChild->SetChildActorClass(EquipSlot.EquipmentClass);
-		TargetChild->CreateChildActor();
-
+		if (TargetChild->IsRegistered())
+		{
+			TargetChild->CreateChildActor();
+		}
+		else
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, TEXT("TargetChild is Not Registered"));
+		}
+		
 		// Disable physics and interaction collision immediately after creation
 		if (AMasterWeapon* Weapon = Cast<AMasterWeapon>(TargetChild->GetChildActor()))
 		{
@@ -113,6 +120,7 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData, bool bSho
 	{
 		SocketName = ItemData->UnequipSocketName;
 	}
+	
 	// Attach to back (storage state)
 	TargetChild->AttachToComponent(
 		CharacterRef->GetMesh(),
@@ -410,34 +418,37 @@ bool UEquipmentSystem::PickupAndEquipWeapon(TSubclassOf<AMasterWeapon> NewWeapon
 	{
 		OutDroppedWeaponClass = CurrentWeapon->GetClass();
 	}
-
-	// 반대 슬롯 무기를 홀스터로 이동 (CurrentEquippedSlot 상관없이, 반대 슬롯에 무기가 있으면 홀스터로)
-	EEquipmentSlot OppositeSlot = (TargetSlot == EEquipmentSlot::Primary)
-		? EEquipmentSlot::Handgun
-		: EEquipmentSlot::Primary;
-
-	UChildActorComponent* OppositeChild = GetChildActorForSlot(OppositeSlot);
-
-	// 반대 슬롯에 무기가 있으면 홀스터로 이동
-	if (OppositeChild && OppositeChild->GetChildActor())
+	
+	if (CurrentEquippedSlot != TargetSlot)
 	{
-		FName HolsterSocket = (OppositeSlot == EEquipmentSlot::Primary)
-			? FName("RifleHost_Socket")
-			: FName("PistolHost_Socket");
+		UChildActorComponent* OppositeChild = GetChildActorForSlot(CurrentEquippedSlot);
 
-		UE_LOG(LogTemp, Log, TEXT("PickupAndEquipWeapon: Moving opposite slot weapon to holster socket: %s"), *HolsterSocket.ToString());
-		UnequipWeapon(HolsterSocket, OppositeSlot);
+		// 반대 슬롯에 무기가 있으면 홀스터로 이동
+		if (OppositeChild && OppositeChild->GetChildActor())
+		{
+			if (FEquipmentSlot* EquipSlot = Equipped.Find(CurrentEquippedSlot))                                                                                                                                                               
+			{                                                                                                                                                                                                                                 
+				if (UItemData* ItemData = EquipSlot->ItemData.Get())                                                                                                                                                                          
+				{                                                                                                                                                                                                                             
+					FName HolsterSocket = ItemData->UnequipSocketName;                                                                                                                                                                        
+					UnequipWeapon(HolsterSocket, CurrentEquippedSlot);                                                                                                                                                                        
+				}                                                                                                                                                                                                                             
+			} 
+		}
 	}
 
 	// 새 무기 클래스 설정
 	TargetChild->SetChildActorClass(NewWeaponClass);
-
+	TargetChild->CreateChildActor();
+	// 손 소켓에 장착
+	FName HandSocket = NAME_None;
 	// SetChildActorClass로 생성된 무기의 CharacterRef 수동 설정
 	if (AMasterWeapon* NewWeapon = Cast<AMasterWeapon>(TargetChild->GetChildActor()))
 	{
 		if (NewWeapon->AttackSystem)
 		{
 			NewWeapon->AttackSystem->CharacterRef = CharacterRef;
+			HandSocket = NewWeapon->WeaponData->EquipSocketName;
 			UE_LOG(LogTemp, Log, TEXT("PickupAndEquipWeapon: CharacterRef manually set for new weapon"));
 		}
 		// Note: Physics is automatically ignored when attached to character
@@ -448,21 +459,19 @@ bool UEquipmentSystem::PickupAndEquipWeapon(TSubclassOf<AMasterWeapon> NewWeapon
 	{
 		PrimaryWeaponClass = NewWeaponClass;
 	}
-	else
+	else if (TargetSlot == EEquipmentSlot::Secondary)
+	{
+		SecondaryWeaponClass = NewWeaponClass;
+	}
+	else if (TargetSlot == EEquipmentSlot::Handgun)
 	{
 		HandgunWeaponClass = NewWeaponClass;
 	}
 
-	// 손 소켓에 장착
-	// TODO: 소켓도 WeaponData에 저장
-	FName HandSocket = (TargetSlot == EEquipmentSlot::Primary)
-		? FName("Rifle_Socket")
-		: FName("Pistol_Socket");
-
 	CurrentWeaponClass = NewWeaponClass;
 	CurrentEquippedSlot = TargetSlot;
-
-	EquipWeapon(HandSocket, TargetSlot);
+	if (HandSocket != NAME_None)
+		EquipWeapon(HandSocket, TargetSlot);
 
 	UE_LOG(LogTemp, Log, TEXT("PickupAndEquipWeapon: Equipped %s to slot %d"),
 		*NewWeaponClass->GetName(), (int32)TargetSlot);

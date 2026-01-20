@@ -105,13 +105,13 @@ private:
 	
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	AMasterWeapon* OwnerWeapon;	
-	
+	AMasterWeapon* OwnerWeapon = nullptr;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	bool bIsDryAmmo;
+	bool bIsDryAmmo = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	bool bAutoReload;
+	bool bAutoReload = false;
 	
 	UPROPERTY()
 	FWeapon_Details Weapon_Details = {

@@ -3,3 +3,24 @@
 
 #include "Gameplay/Items/Equipments/BowAttackSystem.h"
 
+UBowAttackSystem::UBowAttackSystem()
+{
+}
+
+void UBowAttackSystem::BeginPlay()
+{
+	Super::BeginPlay();
+}
+
+void UBowAttackSystem::PerformAttack()
+{
+}
+
+bool UBowAttackSystem::CanReload() const
+{
+	return false;
+}
+
+void UBowAttackSystem::ExecuteReload()
+{
+}

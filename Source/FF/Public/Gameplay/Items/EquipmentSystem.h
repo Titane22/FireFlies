@@ -87,6 +87,9 @@ public:
 	TSubclassOf<AMasterWeapon> PrimaryWeaponClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	TSubclassOf<AMasterWeapon> SecondaryWeaponClass;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
 	TSubclassOf<AMasterWeapon> HandgunWeaponClass;
 
 	// 현재 장착된 무기 슬롯 (None = 맨손)

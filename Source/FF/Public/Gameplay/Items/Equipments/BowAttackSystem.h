@@ -13,5 +13,14 @@ UCLASS()
 class FF_API UBowAttackSystem : public UWeaponAttackSystem
 {
 	GENERATED_BODY()
+
+public:
+	UBowAttackSystem();
+
+	virtual void BeginPlay() override;
 	
+	virtual void PerformAttack() override;
+
+	virtual bool CanReload() const override;
+	virtual void ExecuteReload() override;
 };

@@ -19,9 +19,12 @@ AFFCharacter::AFFCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 
 	Primary = CreateDefaultSubobject<USceneComponent>("Primary");
+	Secondary = CreateDefaultSubobject<USceneComponent>("Secondary");
 	Handgun = CreateDefaultSubobject<USceneComponent>("Handgun");
 	PrimaryChild = CreateDefaultSubobject<UChildActorComponent>("PrimaryChild");
+	SecondaryChild = CreateDefaultSubobject<UChildActorComponent>("SecondaryChild");
 	HandgunChild = CreateDefaultSubobject<UChildActorComponent>("HandgunChild");
+	
 	EquipmentSystem = CreateDefaultSubobject<UEquipmentSystem>("EquipmentSystem");
 	InventorySystem = CreateDefaultSubobject<UInventorySystem>("InventorySystem");
 	HealthComponent = CreateDefaultSubobject<UHealthSystem>("HealthComponent");
@@ -30,11 +33,17 @@ AFFCharacter::AFFCharacter()
 	FlashlightChild = CreateDefaultSubobject<UChildActorComponent>("FlashlightChild");
 
 	Primary->SetupAttachment(RootComponent);
+	Secondary->SetupAttachment(RootComponent);
 	Handgun->SetupAttachment(RootComponent);
 	PrimaryChild->SetupAttachment(Primary);
+	SecondaryChild->SetupAttachment(Secondary);
 	HandgunChild->SetupAttachment(Handgun);
 	FlashlightChild->SetupAttachment(RootComponent);
+
+	SecondaryChild->RegisterComponentWithWorld(GetWorld());
+	
 	EquippedChilds.Add(EEquipmentSlot::Primary, PrimaryChild);
+	EquippedChilds.Add(EEquipmentSlot::Secondary, SecondaryChild);
 	EquippedChilds.Add(EEquipmentSlot::Handgun, HandgunChild);
 }
 

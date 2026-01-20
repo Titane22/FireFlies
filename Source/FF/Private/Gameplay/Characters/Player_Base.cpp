@@ -216,6 +216,10 @@ void APlayer_Base::Reload()
 	{
 		MasterWeapon = Cast<AMasterWeapon>(PrimaryChild->GetChildActor());
 	}
+	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Secondary)
+	{
+		MasterWeapon = Cast<AMasterWeapon>(SecondaryChild->GetChildActor());
+	}
 	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Handgun)
 	{
 		MasterWeapon = Cast<AMasterWeapon>(HandgunChild->GetChildActor());
@@ -620,7 +624,6 @@ void APlayer_Base::Inventory()
 	APC_Base* PC = Cast<APC_Base>(GetController());
 	if (!PC || !OpenInventoryAnimMontage || !CloseInventoryAnimMontage)
 		return;
-	
 	if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
 	{
 		if (PC->IsVisibleWidget())
