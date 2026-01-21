@@ -71,6 +71,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	bool IsEquipped(EEquipmentSlot Slot);
+
+	/** 현재 손에 들고 있는 무기 반환 */
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	AMasterWeapon* GetCurrentWeapon() const;
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;

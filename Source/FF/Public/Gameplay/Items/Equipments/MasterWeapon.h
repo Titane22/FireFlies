@@ -14,6 +14,7 @@ class AInteraction;
 class UWeaponData;
 class APlayer_Base;
 class UInteractionData;
+class UMasterMagazine;
 
 UCLASS()
 class FF_API AMasterWeapon : public AEquipmentBase, public IInteractable
@@ -41,6 +42,14 @@ public:
 
 	USceneComponent* Muzzle;
 
+	/** 현재 장착된 탄창 */
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon")
+	UMasterMagazine* CurrentMagazine = nullptr;
+
+	/** 탄창 교체 - 이전 탄창 반환 (인벤토리로 복귀용) */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	UMasterMagazine* SwapMagazine(UMasterMagazine* NewMagazine);
+	
 private:
 	// 컴포넌트 초기화 함수
 	void InitializeComponents();

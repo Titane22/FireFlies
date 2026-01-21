@@ -6,7 +6,6 @@
 #include "Components/ActorComponent.h"
 #include "WeaponAttackSystem.generated.h"
 
-
 class AFFCharacter;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -25,7 +24,6 @@ protected:
 public:	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-
 		
 	// Hit 처리 함수
 	UFUNCTION(BlueprintCallable, Category = "Combat")
@@ -47,10 +45,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	virtual int32 GetMaxAmmo() const { return 0; }
 
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	virtual void SetCurrentAmmo(float Amount) { }
+
 public:
 	UPROPERTY()
 	AFFCharacter* CharacterRef = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
 	bool bReloading = false;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
+	bool bIsDryAmmo = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	bool bAutoReload = false;
 };

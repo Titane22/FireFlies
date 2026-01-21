@@ -44,7 +44,16 @@ struct FItemSlot
 	/** Optional durability for degradable items (0.0 = broken, 1.0 = pristine) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float Durability = 1.0f;
+	
+	/** Current ammo count for magazines (-1 = not a magazine) */                                                                                                                                                           
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item|Magazine")                                                                                                                                                 
+	int32 CurrentAmmo = -1;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item|Magazine")
+	int32 MaxAmmo = -1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item|Magazine")
+	int32 ClipSize = -1;	
 	//==============================================================================
 	// Constructor & Operators
 	//==============================================================================
@@ -56,6 +65,9 @@ struct FItemSlot
 		, Quantity(1)
 		, InstanceId(FGuid::NewGuid())
 		, Durability(1.0f)
+		, CurrentAmmo(-1)
+		, MaxAmmo(-1)
+		, ClipSize(-1)
 	{}
 
 	FItemSlot(TSoftObjectPtr<UItemData> InItemData, int32 InQuantity = 1)
@@ -65,6 +77,9 @@ struct FItemSlot
 		, Quantity(InQuantity)
 		, InstanceId(FGuid::NewGuid())
 		, Durability(1.0f)
+		, CurrentAmmo(-1)
+		, MaxAmmo(-1)
+		, ClipSize(-1)
 	{}
 
 	bool operator==(const FItemSlot& Other) const
@@ -164,6 +179,9 @@ struct FItemSlot
 		GridCol = -1;
 		Quantity = 0;
 		Durability = 1.0f;
+		CurrentAmmo = -1;
+		MaxAmmo = -1;
+		ClipSize = -1;
 	}
 
 	//==============================================================================
@@ -220,5 +238,40 @@ struct FItemSlot
 		}
 
 		return Cells;
+	}
+
+	// 탄창인지 확인
+	bool IsMagazine() const
+	{
+		return CurrentAmmo >= 0;
+	}
+
+	// 탄창으로 초기화
+	void InitializeAsMagazine(int32 AmmoCount, int32 BaseClipSize, int32 TotalAmmoCount)
+	{
+		CurrentAmmo = AmmoCount;
+		ClipSize = BaseClipSize;
+		MaxAmmo = TotalAmmoCount;
+	}
+
+	// 탄약 소모, 실제 소모량 반환
+	int32 ConsumeAmmo(int32 Amount = 1)
+	{
+		if (CurrentAmmo < 0)
+			return 0;
+		int32 Consumed = FMath::Min(Amount, CurrentAmmo);
+		CurrentAmmo -= Consumed;
+		return Consumed;
+	}
+
+	// 탄약 추가, 오버플로우 반환
+	int32 AddAmmo(int32 Amount, int32 MaxCapacity)
+	{
+		if(CurrentAmmo < 0)
+			CurrentAmmo = 0;
+		int32 AvailableSpace = MaxCapacity - CurrentAmmo;
+		int32 ActualAdd =  FMath::Min(Amount, AvailableSpace);
+		CurrentAmmo += ActualAdd;
+		return Amount - ActualAdd;
 	}
 };

@@ -14,9 +14,20 @@ class AEquipmentBase;
 UENUM(BlueprintType)
 enum class EEquipmentSlot : uint8
 {
-	None        UMETA(DisplayName = "None"),      // 맨손 상태
-	Primary     UMETA(DisplayName = "Primary"),
-	Handgun     UMETA(DisplayName = "Handgun")
+	None			UMETA(DisplayName = "None"),      // 맨손 상태
+	Primary			UMETA(DisplayName = "Primary"),
+	Secondary		UMETA(DisplayName = "Secondary"),
+	Handgun			UMETA(DisplayName = "Handgun")
+};
+
+
+UENUM(BlueprintType)
+enum class EItemType : uint8
+{
+	None			UMETA(DisplayName = "None"),
+	Equipment		UMETA(DisplayName = "Equipment"),
+	Consumable		UMETA(DisplayName = "Consumable"),
+	Ammo			UMETA(DisplayName = "Ammo")
 };
 
 /**
@@ -52,6 +63,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|Basic")
 	FText ItemName;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item|Basic")
+	EItemType ItemType;
+	
 	/** Description of the item */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|Basic", meta = (MultiLine = true))
 	FText ItemDescription;

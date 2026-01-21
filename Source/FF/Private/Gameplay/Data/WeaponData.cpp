@@ -9,9 +9,9 @@ UWeaponData::UWeaponData()
     ItemName = FText::FromString(TEXT("Weapon"));
     bStackable = false;  // Weapons are not stackable
     MaxStackSize = 1;
+	ItemType = EItemType::Equipment;
 
     // Weapon Details
-    WeaponType = EWeaponType::Pistol;
     EquipmentClass = nullptr;
 
     // Fire Mode Data
@@ -28,7 +28,6 @@ UWeaponData::UWeaponData()
     WeaponUITexture = nullptr;
 
     // Animation
-    LeftHandIKOffset = FVector::ZeroVector;
     WeaponEquipMontage = nullptr;
     BodyFireMontage = nullptr;
     WeaponFireMontage = nullptr;

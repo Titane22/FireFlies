@@ -8,7 +8,8 @@ UItemData::UItemData()
 	ItemName = FText::FromString(TEXT("Item"));
 	ItemDescription = FText::FromString(TEXT(""));
 	ItemIcon = nullptr;
-
+	ItemType = EItemType::None;
+	
 	// Stack System
 	bStackable = true;
 	MaxStackSize = 1;

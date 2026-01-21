@@ -395,6 +395,19 @@ bool UEquipmentSystem::IsEquipped(EEquipmentSlot Slot)
 	return false;
 }
 
+AMasterWeapon* UEquipmentSystem::GetCurrentWeapon() const
+{
+	if (CurrentEquippedSlot == EEquipmentSlot::None || !CharacterRef)
+		return nullptr;
+
+	// 현재 슬롯의 ChildActorComponent에서 무기 가져오기
+	UChildActorComponent* const* ChildPtr = CharacterRef->EquippedChilds.Find(CurrentEquippedSlot);
+	if (!ChildPtr || !(*ChildPtr))
+		return nullptr;
+
+	return Cast<AMasterWeapon>((*ChildPtr)->GetChildActor());
+}
+
 bool UEquipmentSystem::PickupAndEquipWeapon(TSubclassOf<AMasterWeapon> NewWeaponClass, EEquipmentSlot TargetSlot, TSubclassOf<AMasterWeapon>& OutDroppedWeaponClass)
 {
 	if (!CharacterRef || !NewWeaponClass || TargetSlot == EEquipmentSlot::None)

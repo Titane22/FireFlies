@@ -2,6 +2,7 @@
 
 #include "Gameplay/Items/InventorySystem.h"
 #include "Gameplay/Data/ItemData.h"
+#include "Gameplay/Data/MagazineData.h"
 
 UInventorySystem::UInventorySystem()
 {
@@ -83,6 +84,13 @@ bool UInventorySystem::AddItem(UItemData* ItemData, int32 GridRow, int32 GridCol
 	NewSlot.GridRow = GridRow;
 	NewSlot.GridCol = GridCol;
 
+	// 탄창이면 CurrentAmmo를 ClipSize로 자동 초기화
+	UMagazineData* MagData = Cast<UMagazineData>(ItemData);
+	if (MagData)
+	{
+		NewSlot.CurrentAmmo = MagData->ClipSize;
+	}
+
 	// Add to items array
 	Items.Add(NewSlot);
 
@@ -94,6 +102,9 @@ bool UInventorySystem::AddItem(UItemData* ItemData, int32 GridRow, int32 GridCol
 
 	UE_LOG(LogTemp, Log, TEXT("[InventorySystem] Added item '%s' at (%d, %d), Weight: %.2f/%.2f"),
 		*ItemData->ItemName.ToString(), GridRow, GridCol, CurrentWeight, MaxWeight);
+
+	// 델리게이트 브로드캐스트
+	OnItemAdded.Broadcast(NewSlot);
 
 	return true;
 }
@@ -166,6 +177,9 @@ bool UInventorySystem::RemoveItem(FGuid InstanceId)
 	}
 
 	FItemSlot& Item = Items[ItemIndex];
+
+	// 델리게이트 브로드캐스트 (제거 전에 호출)
+	OnItemRemoved.Broadcast(Item);
 
 	// Clear grid cells
 	ClearGridCells(Item);
@@ -289,6 +303,92 @@ void UInventorySystem::InitializeGrid()
 	Items.Empty();
 
 	UE_LOG(LogTemp, Log, TEXT("[InventorySystem] Grid initialized: %dx%d (%d cells)"), RowCapacity, ColCapacity, TotalCells);
+}
+
+bool UInventorySystem::HasAmmo(FGameplayTag RequiredAmmoTag)
+{
+	for (const FItemSlot& Item : Items)
+	{
+		UMagazineData* MagazineData = Cast<UMagazineData>(Item.ItemData.Get());
+		if (!MagazineData)
+			continue;
+
+		// Check compatibility and that magazine has ammo
+		if (MagazineData->IsCompatibleWith(RequiredAmmoTag) && Item.CurrentAmmo > 0)
+			return true;
+	}
+
+	return false;
+}
+
+FItemSlot* UInventorySystem::GetBestMagazineSlot(FGameplayTag RequiredAmmoTag)
+{
+	FItemSlot* BestSlot = nullptr;
+	int32 MaxAmmo = 0;
+
+	for (FItemSlot& Item : Items)
+	{
+		UMagazineData* MagazineData = Cast<UMagazineData>(Item.ItemData.Get());
+		if (!MagazineData)
+			continue;
+
+		// Check compatibility and find magazine with most ammo
+		if (MagazineData->IsCompatibleWith(RequiredAmmoTag) && Item.CurrentAmmo > MaxAmmo)
+		{
+			MaxAmmo = Item.CurrentAmmo;
+			BestSlot = &Item;
+		}
+	}
+
+	return BestSlot;
+}
+
+bool UInventorySystem::AddMagazine(UMagazineData* MagazineData, int32 CurrentAmmo)
+{
+	if (!MagazineData)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[InventorySystem] AddMagazine failed: Invalid MagazineData"));
+		return false;
+	}
+
+	// 빈 슬롯 찾기
+	int32 EmptyRow, EmptyCol;
+	if (!FindEmptySpot(MagazineData, EmptyRow, EmptyCol))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[InventorySystem] AddMagazine failed: No empty spot"));
+		return false;
+	}
+
+	// 무게 확인
+	float ItemWeight = MagazineData->GetTotalWeight(1);
+	if (CurrentWeight + ItemWeight > MaxWeight)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[InventorySystem] AddMagazine failed: Weight limit exceeded"));
+		return false;
+	}
+
+	// 새 슬롯 생성
+	FItemSlot NewSlot(MagazineData, 1);
+	NewSlot.GridRow = EmptyRow;
+	NewSlot.GridCol = EmptyCol;
+	NewSlot.CurrentAmmo = CurrentAmmo;  // 탄창 현재 탄약 설정
+
+	// 배열에 추가
+	Items.Add(NewSlot);
+
+	// 그리드 점유
+	OccupyGridCells(NewSlot);
+
+	// 무게 업데이트
+	CurrentWeight += ItemWeight;
+
+	UE_LOG(LogTemp, Log, TEXT("[InventorySystem] Added magazine '%s' at (%d, %d) with %d ammo"),
+		*MagazineData->ItemName.ToString(), EmptyRow, EmptyCol, CurrentAmmo);
+
+	// 델리게이트 브로드캐스트
+	OnItemAdded.Broadcast(NewSlot);
+
+	return true;
 }
 
 int32 UInventorySystem::GetGridIndex(int32 Row, int32 Col) const

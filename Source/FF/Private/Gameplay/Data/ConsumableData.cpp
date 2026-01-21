@@ -9,7 +9,7 @@ UConsumableData::UConsumableData()
 	bStackable = true;
 	MaxStackSize = 99;
 
-	
+	ItemType = EItemType::Consumable;
 }
 
 FPrimaryAssetId UConsumableData::GetPrimaryAssetId() const

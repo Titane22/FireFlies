@@ -3,9 +3,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Components/ActorComponent.h"
 #include "Gameplay/Data/InventoryTypes.h"
 #include "InventorySystem.generated.h"
+
+// 아이템 추가/제거 시 브로드캐스트 (FItemSlot 전체 정보 전달)
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemAdded, const FItemSlot&, AddedItem);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemRemoved, const FItemSlot&, RemovedItem);
+
+class UMagazineData;
 
 /**
  * Grid-based inventory system (Resident Evil style)
@@ -21,6 +28,28 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	
+	//==============================================================================
+	// Helper Functions
+	//==============================================================================
+
+	/** Get 1D array index from 2D grid coordinates */
+	int32 GetGridIndex(int32 Row, int32 Col) const;
+
+	/** Check if grid coordinates are valid */
+	bool IsValidGridPosition(int32 Row, int32 Col) const;
+
+	/** Get the item at a specific grid cell (C++ only) */
+	FItemSlot* GetItemAtCell(int32 Row, int32 Col);
+
+	/** Update grid cells occupied by an item */
+	void OccupyGridCells(const FItemSlot& Item);
+
+	/** Clear grid cells occupied by an item */
+	void ClearGridCells(const FItemSlot& Item);
+
+	/** Recalculate total weight */
+	void RecalculateWeight();
 	
 public:
 	//==============================================================================
@@ -81,6 +110,28 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void InitializeGrid();
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Ammo")
+	bool HasAmmo(FGameplayTag RequiredAmmoTag);
+
+	/** Get the magazine with the most ammo that matches RequiredAmmoTag (C++ only) */
+	FItemSlot* GetBestMagazineSlot(FGameplayTag RequiredAmmoTag);
+
+	/** 탄창을 인벤토리에 추가 (CurrentAmmo 포함) */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Ammo")
+	bool AddMagazine(UMagazineData* MagazineData, int32 CurrentAmmo);
+
+	//==============================================================================
+	// Delegates
+	//==============================================================================
+
+	/** 아이템이 인벤토리에 추가되었을 때 */
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Events")
+	FOnItemAdded OnItemAdded;
+
+	/** 아이템이 인벤토리에서 제거되었을 때 */
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Events")
+	FOnItemRemoved OnItemRemoved;
+
 protected:
 	//==============================================================================
 	// Grid Configuration
@@ -110,26 +161,7 @@ protected:
 	/** Current total weight of all items */
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory|Data")
 	float CurrentWeight = 0.0f;
-
-	//==============================================================================
-	// Helper Functions
-	//==============================================================================
-
-	/** Get 1D array index from 2D grid coordinates */
-	int32 GetGridIndex(int32 Row, int32 Col) const;
-
-	/** Check if grid coordinates are valid */
-	bool IsValidGridPosition(int32 Row, int32 Col) const;
-
-	/** Get the item at a specific grid cell (C++ only) */
-	FItemSlot* GetItemAtCell(int32 Row, int32 Col);
-
-	/** Update grid cells occupied by an item */
-	void OccupyGridCells(const FItemSlot& Item);
-
-	/** Clear grid cells occupied by an item */
-	void ClearGridCells(const FItemSlot& Item);
-
-	/** Recalculate total weight */
-	void RecalculateWeight();
+	
+public:
+	
 };

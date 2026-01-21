@@ -10,7 +10,11 @@
 #include "Gameplay/Items/EquipmentSystem.h"
 #include "Gameplay/Items/InventorySystem.h"
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
+#include "Gameplay/Items/Equipments/MasterMagazine.h"
+#include "Gameplay/Items/Equipments/WeaponAttackSystem.h"
 #include "Gameplay/Items/Interaction/Interactor.h"
+#include "Gameplay/Data/MagazineData.h"
+#include "Gameplay/Data/WeaponData.h"
 
 // Sets default values
 AFFCharacter::AFFCharacter()
@@ -84,6 +88,9 @@ void AFFCharacter::BeginPlay()
 			}
 		}
 	}
+
+	// 인벤토리-무기 조율을 위한 델리게이트 바인딩
+	BindInventoryDelegates();
 }
 
 void AFFCharacter::SwitchWeapon(EEquipmentSlot Slot)
@@ -108,5 +115,74 @@ void AFFCharacter::FlashOnOff()
 	{
 		FlashlightChild->SetVisibility(true);
 	}
+}
+
+//==============================================================================
+// Inventory-Weapon Mediation
+//==============================================================================
+
+void AFFCharacter::BindInventoryDelegates()
+{
+	if (InventorySystem)
+	{
+		InventorySystem->OnItemAdded.AddDynamic(this, &AFFCharacter::OnInventoryItemAdded);
+		UE_LOG(LogTemp, Log, TEXT("FFCharacter: Bound to InventorySystem delegates"));
+	}
+}
+
+void AFFCharacter::OnInventoryItemAdded(const FItemSlot& AddedItem)
+{
+	// 현재 무기 확인
+	AMasterWeapon* CurrentWeapon = GetCurrentWeapon();
+	if (!CurrentWeapon)
+		return;
+
+	// 무기가 리로드 필요한지 확인
+	if (!DoesWeaponNeedReload(CurrentWeapon))
+		return;
+
+	// 추가된 아이템이 탄창인지 확인
+	UMagazineData* MagData = Cast<UMagazineData>(AddedItem.ItemData.Get());
+	if (!MagData)
+		return;
+
+	// 무기와 호환되는 탄창인지 확인
+	if (!CurrentWeapon->WeaponData)
+		return;
+
+	if (!MagData->IsCompatibleWith(CurrentWeapon->WeaponData->RequiredAmmoType))
+		return;
+
+	// 탄약이 있는 탄창인지 확인
+	if (AddedItem.CurrentAmmo <= 0)
+		return;
+
+	
+	// 자동 리로드 설정 확인
+	if (CurrentWeapon->AttackSystem && CurrentWeapon->AttackSystem->bAutoReload)
+	{
+		UE_LOG(LogTemp, Log, TEXT("FFCharacter: Auto-reload triggered by new magazine"));
+		CurrentWeapon->Reload();
+	}
+}
+
+AMasterWeapon* AFFCharacter::GetCurrentWeapon() const
+{
+	if (!EquipmentSystem)
+		return nullptr;
+
+	return EquipmentSystem->GetCurrentWeapon();
+}
+
+bool AFFCharacter::DoesWeaponNeedReload(AMasterWeapon* Weapon) const
+{
+	if (!Weapon)
+		return false;
+
+	// 탄창이 없거나 비어있으면 리로드 필요
+	if (!Weapon->CurrentMagazine)
+		return true;
+
+	return !Weapon->CurrentMagazine->HasAmmo();
 }
 

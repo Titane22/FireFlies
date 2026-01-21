@@ -16,46 +16,6 @@ class UUserWidget;
 class UNiagaraSystem;
 class USceneComponent;
 
-USTRUCT(BlueprintType)
-struct FWeapon_Data
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	int32 CurrentAmmo = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	int32 MaxAmmo = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	int32 ClipAmmo = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	int32 DifferentAmmo = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	int32 Ammo_Count = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	bool ShortGun_Trace = false;
-};
-
-USTRUCT(BlueprintType)
-struct FWeapon_Details
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	struct FWeapon_Data Weapon_Data = {
-		/* CurrentAmmo */ 0,
-		/* MaxAmmo */ 0,
-		/* ClipAmmo */ 0,
-		/* DifferentAmmo */ 0,
-		/* Ammo_Count */ 0,
-		/* ShortGun_Trace */ false
-	};
-};
-
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class FF_API UGunAttackSystem : public UWeaponAttackSystem
 {
@@ -71,8 +31,9 @@ public:
 
 	virtual bool CanReload() const override;
 	virtual void ExecuteReload() override;
-	virtual int32 GetCurrentAmmo() const override { return Weapon_Details.Weapon_Data.CurrentAmmo; }
-	virtual int32 GetMaxAmmo() const override { return Weapon_Details.Weapon_Data.MaxAmmo; }
+	virtual int32 GetCurrentAmmo() const override;
+	virtual int32 GetMaxAmmo() const override;
+	virtual void SetCurrentAmmo(float Amount) override;
 	
 	void FireBullet(FHitResult Hit, bool bReturnHit);
 
@@ -107,21 +68,4 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	AMasterWeapon* OwnerWeapon = nullptr;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	bool bIsDryAmmo = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	bool bAutoReload = false;
-	
-	UPROPERTY()
-	FWeapon_Details Weapon_Details = {
-		FWeapon_Data{
-			/* CurrentAmmo */ 32,
-			/* MaxAmmo */ 90,
-			/* ClipAmmo */ 32,
-			/* DifferentAmmo */ 90,
-			/* Ammo_Count */ 1,
-			/* ShortGun_Trace */ false
-		}
-	};	
 };

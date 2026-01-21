@@ -20,6 +20,7 @@
 #include "Presentations/HUD/W_MasterHUD.h"
 #include "Gameplay/Interfaces/Damageable.h"
 #include "Engine/DamageEvents.h"
+#include "Gameplay/Items/Equipments/MasterMagazine.h"
 
 // Sets default values
 AMasterWeapon::AMasterWeapon()
@@ -84,6 +85,29 @@ float AMasterWeapon::GetMaxAmmo() const
 float AMasterWeapon::GetCurrentAmmo() const
 {
     return AttackSystem ? AttackSystem->GetCurrentAmmo() : 0;
+}
+
+UMasterMagazine* AMasterWeapon::SwapMagazine(UMasterMagazine* NewMagazine)
+{
+    UMasterMagazine* OldMagazine = CurrentMagazine;
+
+    // 새 탄창 장착
+    CurrentMagazine = NewMagazine;
+
+    if (CurrentMagazine)
+    {
+        UE_LOG(LogTemp, Log, TEXT("MasterWeapon::SwapMagazine - New magazine set (Ammo: %d/%d)"),
+            CurrentMagazine->GetCurrentAmmo(), CurrentMagazine->GetClipSize());
+    }
+
+    if (OldMagazine)
+    {
+        UE_LOG(LogTemp, Log, TEXT("MasterWeapon::SwapMagazine - Old magazine returned (Ammo: %d/%d)"),
+            OldMagazine->GetCurrentAmmo(), OldMagazine->GetClipSize());
+    }
+
+    // 이전 탄창 반환 (호출자가 인벤토리로 복귀 처리)
+    return OldMagazine;
 }
 
 AMasterWeapon* AMasterWeapon::SpawnDroppedWeapon(UWorld* World, UWeaponData* WeaponData, const FVector& Location, const FRotator& Rotation, AActor* Owner)

@@ -3,6 +3,9 @@
 
 #include "Gameplay/Items/Equipments/GunAttackSystem.h"
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
+#include "Gameplay/Items/Equipments/MasterMagazine.h"
+#include "Gameplay/Items/InventorySystem.h"
+#include "Gameplay/Data/MagazineData.h"
 #include "Gameplay/Characters/FFCharacter.h"
 #include "Gameplay/Characters/Player_Base.h"
 #include "Gameplay/Data/WeaponData.h"
@@ -31,24 +34,6 @@ void UGunAttackSystem::BeginPlay()
 		UE_LOG(LogTemp, Error, TEXT("GunAttackSystem::BeginPlay - OwnerWeapon is NULL! Component must be attached to AMasterWeapon."));
 		return;
 	}
-
-	// WeaponData로부터 탄약 정보 로드
-	if (OwnerWeapon->WeaponData)
-	{
-		Weapon_Details.Weapon_Data.CurrentAmmo = OwnerWeapon->WeaponData->CurrentAmmo;
-		Weapon_Details.Weapon_Data.MaxAmmo = OwnerWeapon->WeaponData->MaxAmmo;
-		Weapon_Details.Weapon_Data.ClipAmmo = OwnerWeapon->WeaponData->ClipAmmo;
-		Weapon_Details.Weapon_Data.DifferentAmmo = OwnerWeapon->WeaponData->DifferentAmmo;
-		Weapon_Details.Weapon_Data.Ammo_Count = OwnerWeapon->WeaponData->AmmoCount;
-		Weapon_Details.Weapon_Data.ShortGun_Trace = OwnerWeapon->WeaponData->bShortGunTrace;
-
-		UE_LOG(LogTemp, Log, TEXT("MasterWeapon::BeginPlay - Loaded ammo from WeaponData: CurrentAmmo=%d, MaxAmmo=%d"),
-			OwnerWeapon->WeaponData->CurrentAmmo, OwnerWeapon->WeaponData->MaxAmmo);
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("MasterWeapon::BeginPlay - WeaponData is not assigned! Using default ammo values."));
-	}
 }
 
 void UGunAttackSystem::PerformAttack()
@@ -60,26 +45,34 @@ void UGunAttackSystem::PerformAttack()
 		return;
 	}
 
-	if (!OwnerWeapon->WeaponData)
+	if (!OwnerWeapon || !OwnerWeapon->WeaponData)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[Fire] WeaponSystem or WeaponData is NULL!"));
+		UE_LOG(LogTemp, Error, TEXT("[Fire] OwnerWeapon or WeaponData is NULL!"));
+		return;
+	}
+
+	// 탄창이 없으면 발사 불가
+	if (!OwnerWeapon->CurrentMagazine)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Fire] No magazine loaded"));
+		if (OwnerWeapon->WeaponData->EmptySound)
+		{
+			EmptyFX(OwnerWeapon->WeaponData->EmptySound);
+		}
 		return;
 	}
 
 	// Check if we have ammo
-	if (!FireCheck(Weapon_Details.Weapon_Data.Ammo_Count))
+	if (!FireCheck(1/*TODO: 발사 탄 수*/))
 	{
 		// No ammo - handle empty fire
-		if (Weapon_Details.Weapon_Data.MaxAmmo > 0)
+		if (bAutoReload && OwnerWeapon)
 		{
-			if (bAutoReload && OwnerWeapon)
-			{
-				OwnerWeapon->Reload();
-			}
-			else if (OwnerWeapon->WeaponData->EmptySound)
-			{
-				EmptyFX(OwnerWeapon->WeaponData->EmptySound);
-			}
+			OwnerWeapon->Reload();
+		}
+		else if (OwnerWeapon->WeaponData->EmptySound)
+		{
+			EmptyFX(OwnerWeapon->WeaponData->EmptySound);
 		}
 		return;
 	}
@@ -116,6 +109,7 @@ void UGunAttackSystem::PerformAttack()
 
 bool UGunAttackSystem::CanReload() const
 {
+	// TODO: MaxAmmo를 지우고 ClipSize가 이전의 MaxAmmo를 대체?
 	return CheckAmmo();
 }
 
@@ -123,6 +117,28 @@ void UGunAttackSystem::ExecuteReload()
 {
 	// 탄약 계산만 수행 (애니메이션, 타이머, UI는 MasterWeapon에서 처리)
 	ReloadCheck();
+}
+
+int32 UGunAttackSystem::GetCurrentAmmo() const
+{
+	if (!OwnerWeapon || !OwnerWeapon->CurrentMagazine)
+		return 0;
+	return OwnerWeapon->CurrentMagazine->GetCurrentAmmo();
+}
+
+int32 UGunAttackSystem::GetMaxAmmo() const
+{
+	if (!OwnerWeapon || !OwnerWeapon->CurrentMagazine)
+		return 0;
+	return OwnerWeapon->CurrentMagazine->GetClipSize();
+}
+
+void UGunAttackSystem::SetCurrentAmmo(float Amount)
+{
+	if (!OwnerWeapon || !OwnerWeapon->CurrentMagazine)
+		return;
+	// CurrentAmmo 직접 설정은 지양하지만, 호환성을 위해 유지
+	OwnerWeapon->CurrentMagazine->CurrentAmmo = static_cast<int32>(Amount);
 }
 
 void UGunAttackSystem::FireBullet(FHitResult Hit, bool bReturnHit)
@@ -273,10 +289,15 @@ void UGunAttackSystem::RandPointInCircle(float Radius, float& PointX, float& Poi
 
 bool UGunAttackSystem::FireCheck(int32 AmmoCount)
 {
-	if(Weapon_Details.Weapon_Data.CurrentAmmo == 0)
+	if (!OwnerWeapon || !OwnerWeapon->CurrentMagazine)
 		return false;
-	Weapon_Details.Weapon_Data.CurrentAmmo = Weapon_Details.Weapon_Data.CurrentAmmo - AmmoCount;
-	return true;
+
+	if (!OwnerWeapon->CurrentMagazine->HasAmmo())
+		return false;
+
+	// 탄약 소비
+	int32 Consumed = OwnerWeapon->CurrentMagazine->ConsumeAmmo(AmmoCount);
+	return Consumed > 0;
 }
 
 void UGunAttackSystem::FireFX(USoundBase* Sound, FVector Location, USoundAttenuation* AttenuationSettings, USoundConcurrency* ConcurrencySettings)
@@ -420,9 +441,19 @@ void UGunAttackSystem::FireMontage(UAnimMontage* FireAnim)
 
 bool UGunAttackSystem::CheckAmmo() const
 {
-	bool bHasAmmo = Weapon_Details.Weapon_Data.MaxAmmo > 0;
-	bool bCanReload = Weapon_Details.Weapon_Data.CurrentAmmo < Weapon_Details.Weapon_Data.ClipAmmo;
-	return bHasAmmo && bCanReload;
+	if (!OwnerWeapon || !OwnerWeapon->WeaponData || !CharacterRef)
+		return false;
+
+	// 현재 탄창이 가득 차 있으면 리로드 불필요
+	if (OwnerWeapon->CurrentMagazine && OwnerWeapon->CurrentMagazine->IsFull())
+		return false;
+
+	// 인벤토리에서 호환 탄창 확인
+	UInventorySystem* InventorySys = CharacterRef->FindComponentByClass<UInventorySystem>();
+	if (!InventorySys)
+		return false;
+
+	return InventorySys->HasAmmo(OwnerWeapon->WeaponData->RequiredAmmoType);
 }
 
 float UGunAttackSystem::ReloadMontage(UAnimMontage* ReloadAnim)
@@ -439,48 +470,55 @@ float UGunAttackSystem::ReloadMontage(UAnimMontage* ReloadAnim)
 
 void UGunAttackSystem::ReloadCheck()
 {
-	Weapon_Details.Weapon_Data;
-	if (Weapon_Details.Weapon_Data.MaxAmmo > 0)
+	if (!OwnerWeapon || !OwnerWeapon->WeaponData || !CharacterRef)
+		return;
+
+	UInventorySystem* InventorySys = CharacterRef->FindComponentByClass<UInventorySystem>();
+	if (!InventorySys)
+		return;
+
+	// 인벤토리에서 가장 탄약이 많은 탄창 검색
+	FItemSlot* BestMagazineSlot = InventorySys->GetBestMagazineSlot(OwnerWeapon->WeaponData->RequiredAmmoType);
+	if (!BestMagazineSlot)
 	{
-		if (Weapon_Details.Weapon_Data.CurrentAmmo == 0)
+		UE_LOG(LogTemp, Warning, TEXT("ReloadCheck: No compatible magazine found in inventory"));
+		return;
+	}
+
+	UMagazineData* NewMagazineData = Cast<UMagazineData>(BestMagazineSlot->ItemData.Get());
+	if (!NewMagazineData)
+		return;
+
+	// 새 탄창 생성 
+	UMasterMagazine* NewMagazine = NewObject<UMasterMagazine>(OwnerWeapon);
+	NewMagazine->InitializeFromData(NewMagazineData, BestMagazineSlot->CurrentAmmo);
+
+	// 탄창 교체 (이전 탄창 반환)
+	UMasterMagazine* OldMagazine = OwnerWeapon->SwapMagazine(NewMagazine);
+
+	// 기존 탄창 처리 (있으면 인벤토리로 복귀)
+	if (OldMagazine && OldMagazine->MagazineData)
+	{
+		bool bReturned = InventorySys->AddMagazine(OldMagazine->MagazineData, OldMagazine->GetCurrentAmmo());
+		if (bReturned)
 		{
-			if (Weapon_Details.Weapon_Data.MaxAmmo >= Weapon_Details.Weapon_Data.ClipAmmo)
-			{
-				Weapon_Details.Weapon_Data.CurrentAmmo = Weapon_Details.Weapon_Data.ClipAmmo;
-				Weapon_Details.Weapon_Data.MaxAmmo = Weapon_Details.Weapon_Data.MaxAmmo - Weapon_Details.Weapon_Data.ClipAmmo;
-			}
-			else
-			{
-				Weapon_Details.Weapon_Data.CurrentAmmo = Weapon_Details.Weapon_Data.MaxAmmo;
-				Weapon_Details.Weapon_Data.MaxAmmo = 0;
-			}
+			UE_LOG(LogTemp, Log, TEXT("ReloadCheck: Old magazine returned to inventory (Ammo: %d)"),
+				OldMagazine->GetCurrentAmmo());
 		}
 		else
 		{
-			if (Weapon_Details.Weapon_Data.MaxAmmo >= Weapon_Details.Weapon_Data.ClipAmmo)
-			{
-				Weapon_Details.Weapon_Data.MaxAmmo = Weapon_Details.Weapon_Data.MaxAmmo - (Weapon_Details.Weapon_Data.ClipAmmo - Weapon_Details.Weapon_Data.CurrentAmmo);
-				Weapon_Details.Weapon_Data.CurrentAmmo = Weapon_Details.Weapon_Data.ClipAmmo;
-			}
-			else
-			{
-				int32 RemainAmmo = Weapon_Details.Weapon_Data.ClipAmmo - Weapon_Details.Weapon_Data.CurrentAmmo;
-				if (RemainAmmo > Weapon_Details.Weapon_Data.MaxAmmo)
-				{
-					Weapon_Details.Weapon_Data.CurrentAmmo = Weapon_Details.Weapon_Data.CurrentAmmo + Weapon_Details.Weapon_Data.MaxAmmo;
-					Weapon_Details.Weapon_Data.MaxAmmo = 0;
-				}
-				else
-				{
-					Weapon_Details.Weapon_Data.CurrentAmmo = Weapon_Details.Weapon_Data.CurrentAmmo + RemainAmmo;
-					Weapon_Details.Weapon_Data.MaxAmmo = Weapon_Details.Weapon_Data.MaxAmmo - RemainAmmo;
-				}
-			}
+			UE_LOG(LogTemp, Warning, TEXT("ReloadCheck: Failed to return old magazine to inventory (no space?)"));
+			// 인벤토리가 가득 찬 경우 - 탄창 드롭 로직 필요 (TODO)
 		}
-		FireCheck(0);
+		// OldMagazine은 GC가 자동 처리
 	}
-}
 
+	// 인벤토리에서 사용한 탄창 슬롯 제거
+	InventorySys->RemoveItem(BestMagazineSlot->InstanceId);
+
+	UE_LOG(LogTemp, Log, TEXT("ReloadCheck: Magazine swapped (New ammo: %d/%d)"),
+		NewMagazine->GetCurrentAmmo(), NewMagazine->GetClipSize());
+}
 
 bool UGunAttackSystem::PerformCameraTrace(APlayerCameraManager* CameraManager, FHitResult& OutHitResult)
 {

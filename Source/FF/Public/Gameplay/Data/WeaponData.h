@@ -4,19 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Gameplay/Data/ItemData.h"
+#include "GameplayTagContainer.h"
 #include "WeaponData.generated.h"
 
 class UNiagaraSystem;
 class AMasterWeapon;
 class UW_DynamicWeaponHUD;
 class UWeaponAttackSystem;
-
-UENUM(BlueprintType)
-enum class EWeaponType : uint8
-{
-	Pistol          UMETA(DisplayName = "Pistol"),
-	RifleAndShotgun UMETA(DisplayName = "Rifle/Shotgun")
-};
 
 UENUM(BlueprintType)
 enum class EWeaponAttackType : uint8
@@ -50,9 +44,6 @@ public:
 	
 	// Weapon Details
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Details")
-	EWeaponType WeaponType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Details")
 	TSubclassOf<UWeaponAttackSystem> AttackComponentClass;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fire Mode Data")
@@ -82,9 +73,6 @@ public:
 	UTexture2D* WeaponUITexture;
 
 	// Animation	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
-	FVector LeftHandIKOffset;
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	UAnimMontage* BodyFireMontage;
 
@@ -129,21 +117,7 @@ public:
 	TSubclassOf<UUserWidget> HitMarkerUI;
 
 	// Ammo Data
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	int32 CurrentAmmo = 30;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ammo")
+	FGameplayTag RequiredAmmoType;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	int32 MaxAmmo = 90;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	int32 ClipAmmo = 30;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	int32 DifferentAmmo = 90;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	int32 AmmoCount = 1;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
-	bool bShortGunTrace = false;
 };

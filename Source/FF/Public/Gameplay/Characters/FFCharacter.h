@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Gameplay/Data/ItemData.h"
+#include "Gameplay/Data/InventoryTypes.h"
 #include "FFCharacter.generated.h"
 
 class UInteractor;
@@ -13,6 +14,7 @@ class UHealthSystem;
 class UInventorySystem;
 class UEquipmentSystem;
 class UPhysicalAnimationComponent;
+class AMasterWeapon;
 struct FInputActionValue;
 
 UCLASS()
@@ -101,4 +103,21 @@ protected:
 	bool IsSprint;
 
 	bool bIsDodging;
+
+	//==============================================================================
+	// Inventory-Weapon Mediation (조율)
+	//==============================================================================
+
+	/** 인벤토리 아이템 추가 시 호출 - 무기 자동 리로드 체크 */
+	UFUNCTION()
+	void OnInventoryItemAdded(const FItemSlot& AddedItem);
+
+	/** 현재 장착된 무기 반환 */
+	AMasterWeapon* GetCurrentWeapon() const;
+
+	/** 무기가 리로드 필요한지 확인 */
+	bool DoesWeaponNeedReload(AMasterWeapon* Weapon) const;
+
+	/** 인벤토리 델리게이트 바인딩 */
+	void BindInventoryDelegates();
 };
