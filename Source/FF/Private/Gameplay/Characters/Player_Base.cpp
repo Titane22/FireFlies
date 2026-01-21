@@ -3,6 +3,7 @@
 
 #include "Gameplay/Characters/Player_Base.h"
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
+#include "Gameplay/Items/Equipments/BowAttackSystem.h"
 #include "Gameplay/Items/EquipmentSystem.h"
 #include "Gameplay/Items/InventorySystem.h"
 #include "Gameplay/Items/Interaction/Interactor.h"
@@ -162,6 +163,10 @@ void APlayer_Base::UpdateWeaponUI(UWeaponData* WeaponData)
 	{
 		Weapon = Cast<AMasterWeapon>(PrimaryChild->GetChildActor());
 	}
+	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Secondary)
+	{
+		Weapon = Cast<AMasterWeapon>(SecondaryChild->GetChildActor());
+	}
 	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Handgun)
 	{
 		Weapon = Cast<AMasterWeapon>(HandgunChild->GetChildActor());
@@ -200,8 +205,35 @@ void APlayer_Base::ShootFire(const FInputActionValue& Value)
 {
 	if (!bIsAiming)
 		return;
-	
-	bFiring = Value.Get<bool>();
+
+	const bool bPressed = Value.Get<bool>();
+
+	// 활(Secondary 슬롯, BowAttackSystem)일 경우: 누를 때 차지 시작, 뗄 때 발사
+	if (EquipmentSystem && EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Secondary)
+	{
+		if (!CanFire())
+			return;
+
+		AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(SecondaryChild->GetChildActor());
+		if (MasterWeapon && MasterWeapon->AttackSystem)
+		{
+			if (UBowAttackSystem* BowSystem = Cast<UBowAttackSystem>(MasterWeapon->AttackSystem))
+			{
+				if (bPressed)
+				{
+					BowSystem->StartCharge();
+				}
+				else
+				{
+					BowSystem->ReleaseCharge();
+				}
+				return;
+			}
+		}
+	}
+
+	// 그 외 무기는 기존 총기 로직 유지 (누르는 동안 발사)
+	bFiring = bPressed;
 	HandleFiring();
 }
 
@@ -253,6 +285,11 @@ void APlayer_Base::HandleFiring()
 		AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(PrimaryChild->GetChildActor());
 		UWeaponData* CurrentWeaponDataAsset = MasterWeapon->WeaponData;
 		ReadyToFire(MasterWeapon, CurrentWeaponDataAsset);
+	}
+	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Secondary)
+	{
+		AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(SecondaryChild->GetChildActor());
+		MasterWeapon->Attack();
 	}
 	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Handgun)
 	{

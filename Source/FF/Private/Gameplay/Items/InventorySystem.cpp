@@ -493,3 +493,77 @@ void UInventorySystem::RecalculateWeight()
 		CurrentWeight += Item.GetTotalWeight();
 	}
 }
+
+//==============================================================================
+// Arrow System (Quantity-based ammo)
+//==============================================================================
+
+bool UInventorySystem::HasArrow(FGameplayTag RequiredArrowTag)
+{
+	for (const FItemSlot& Item : Items)
+	{
+		UMagazineData* ArrowData = Cast<UMagazineData>(Item.ItemData.Get());
+		if (!ArrowData)
+			continue;
+
+		// 태그 호환성 및 수량 확인
+		if (ArrowData->IsCompatibleWith(RequiredArrowTag) && Item.Quantity > 0)
+			return true;
+	}
+
+	return false;
+}
+
+FItemSlot* UInventorySystem::GetBestArrowSlot(FGameplayTag RequiredArrowTag)
+{
+	FItemSlot* BestSlot = nullptr;
+	int32 MaxQuantity = 0;
+
+	for (FItemSlot& Item : Items)
+	{
+		UMagazineData* ArrowData = Cast<UMagazineData>(Item.ItemData.Get());
+		if (!ArrowData)
+			continue;
+
+		// 태그 호환성 및 가장 많은 수량의 슬롯 찾기
+		if (ArrowData->IsCompatibleWith(RequiredArrowTag) && Item.Quantity > MaxQuantity)
+		{
+			MaxQuantity = Item.Quantity;
+			BestSlot = &Item;
+		}
+	}
+
+	return BestSlot;
+}
+
+UItemData* UInventorySystem::ConsumeArrow(FGameplayTag RequiredArrowTag)
+{
+	FItemSlot* ArrowSlot = GetBestArrowSlot(RequiredArrowTag);
+	if (!ArrowSlot || ArrowSlot->Quantity <= 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[InventorySystem] ConsumeArrow: No arrows available"));
+		return nullptr;
+	}
+
+	UItemData* ArrowItemData = ArrowSlot->ItemData.Get();
+
+	// 수량 1 감소
+	ArrowSlot->Quantity -= 1;
+
+	UE_LOG(LogTemp, Log, TEXT("[InventorySystem] ConsumeArrow: Consumed 1 arrow (Remaining: %d)"),
+		ArrowSlot->Quantity);
+
+	// 수량이 0이 되면 슬롯 제거
+	if (ArrowSlot->Quantity <= 0)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[InventorySystem] ConsumeArrow: Arrow stack depleted, removing slot"));
+		RemoveItem(ArrowSlot->InstanceId);
+	}
+	else
+	{
+		// 무게 재계산
+		RecalculateWeight();
+	}
+
+	return ArrowItemData;
+}

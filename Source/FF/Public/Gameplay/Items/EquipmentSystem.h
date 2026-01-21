@@ -20,8 +20,6 @@ enum class EWeaponState : uint8
 	Unequip     UMETA(DisplayName = "Unequip")
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEquipmentStateChangedDelegate);
-
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class FF_API UEquipmentSystem : public UActorComponent
 {
@@ -108,8 +106,6 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Equipment")
 	TMap<EEquipmentSlot, FEquipmentSlot> Equipped;
 
-	UPROPERTY()
-	FOnEquipmentStateChangedDelegate OnEquipmentStateChanged;
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AMasterWeapon> CurrentWeaponClass;

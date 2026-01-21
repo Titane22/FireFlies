@@ -78,20 +78,10 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData, bool bSho
 			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, TEXT("TargetChild is Not Registered"));
 		}
 		
-		// Disable physics and interaction collision immediately after creation
+		// 장착 시 콜리전 비활성화
 		if (AMasterWeapon* Weapon = Cast<AMasterWeapon>(TargetChild->GetChildActor()))
 		{
-			if (Weapon->EquipmentMesh)
-			{
-				Weapon->EquipmentMesh->SetSimulatePhysics(false);
-				Weapon->EquipmentMesh->SetEnableGravity(false);
-			}
-			// Disable interaction collision when equipped
-			if (Weapon->InteractCollision)
-			{
-				Weapon->InteractCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			}
-			UE_LOG(LogTemp, Log, TEXT("[Equip] Disabled physics and interaction for newly created weapon"));
+			Weapon->OnEquipped();
 		}
 	}
 	// 3. 타겟 Child Actor에 붙이기
@@ -152,7 +142,11 @@ UWeaponData* UEquipmentSystem::Unequip(EEquipmentSlot Slot)
 	{
 		AMasterWeapon* Weapon = Cast<AMasterWeapon>(TargetChild->GetChildActor());
 		if (Weapon)
+		{
+			// 장착 해제 시 콜리전 활성화 (Interactable)
+			//Weapon->OnUnequipped();
 			Weapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		}
 		TargetChild->DestroyChildActor();
 	}
 
@@ -283,7 +277,6 @@ void UEquipmentSystem::SwitchToWeapon(EEquipmentSlot TargetSlot)
 
 	// 3. 상태 업데이트
 	CurrentEquippedSlot = TargetSlot;
-	//OnEquipmentStateChanged.Broadcast();
 	UE_LOG(LogTemp, Log, TEXT("Switched to weapon slot: %d"), (int32)TargetSlot);
 }
 
@@ -322,7 +315,7 @@ void UEquipmentSystem::UnequipWeapon(FName SocketName, EEquipmentSlot WeaponSlot
 		),
 		SocketName
 	);
-	//OnEquipmentStateChanged.Broadcast();
+
 }
 
 void UEquipmentSystem::EquipFromInventory(FGuid InstanceID, EEquipmentSlot TargetSlot)
@@ -464,7 +457,8 @@ bool UEquipmentSystem::PickupAndEquipWeapon(TSubclassOf<AMasterWeapon> NewWeapon
 			HandSocket = NewWeapon->WeaponData->EquipSocketName;
 			UE_LOG(LogTemp, Log, TEXT("PickupAndEquipWeapon: CharacterRef manually set for new weapon"));
 		}
-		// Note: Physics is automatically ignored when attached to character
+		// 장착 시 콜리전 비활성화
+		NewWeapon->OnEquipped();
 	}
 
 	// 무기 클래스 업데이트

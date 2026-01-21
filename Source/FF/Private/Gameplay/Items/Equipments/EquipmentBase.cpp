@@ -9,14 +9,16 @@ AEquipmentBase::AEquipmentBase()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+	DefaultRoot = CreateDefaultSubobject<USceneComponent>("DefaultRoot");
 	EquipmentMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("EquipmentMesh"));
 	InteractCollision = CreateDefaultSubobject<USphereComponent>(TEXT("InteractCollision"));
 
 	// Setting up the component hierarchy
-	RootComponent = EquipmentMesh;
+	RootComponent = DefaultRoot;
+	EquipmentMesh->SetupAttachment(RootComponent);
+	EquipmentMesh->SetCollisionProfileName(FName("PhysicsActor"));
+	
 	InteractCollision->SetupAttachment(EquipmentMesh);
-
-	// Set InteractBox collision preset to Interactable
 	InteractCollision->SetCollisionProfileName(FName("Interactable"));
 }
 

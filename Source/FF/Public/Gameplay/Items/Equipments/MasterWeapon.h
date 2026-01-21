@@ -49,7 +49,15 @@ public:
 	/** 탄창 교체 - 이전 탄창 반환 (인벤토리로 복귀용) */
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	UMasterMagazine* SwapMagazine(UMasterMagazine* NewMagazine);
-	
+
+	/** 장착 시 호출 - 콜리전 비활성화 */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	virtual void OnEquipped();
+
+	/** 장착 해제 시 호출 - 콜리전 활성화 (Interactable 프리셋) */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	virtual void OnUnequipped();
+
 private:
 	// 컴포넌트 초기화 함수
 	void InitializeComponents();

@@ -121,6 +121,21 @@ public:
 	bool AddMagazine(UMagazineData* MagazineData, int32 CurrentAmmo);
 
 	//==============================================================================
+	// Arrow System (Quantity-based ammo)
+	//==============================================================================
+
+	/** 인벤토리에 해당 태그의 화살이 있는지 확인 */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Arrow")
+	bool HasArrow(FGameplayTag RequiredArrowTag);
+
+	/** 해당 태그의 화살 슬롯 중 가장 많은 수량을 가진 슬롯 반환 (C++ only) */
+	FItemSlot* GetBestArrowSlot(FGameplayTag RequiredArrowTag);
+
+	/** 화살 1개 소모 - 성공 시 소모된 ItemData 반환 */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Arrow")
+	UItemData* ConsumeArrow(FGameplayTag RequiredArrowTag);
+
+	//==============================================================================
 	// Delegates
 	//==============================================================================
 

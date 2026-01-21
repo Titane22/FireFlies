@@ -48,18 +48,9 @@ void AMasterWeapon::BeginPlay()
         UE_LOG(LogTemp, Error, TEXT("MasterWeapon::BeginPlay - WeaponData or AttackComponentClass is NULL!"));                                                                                                                    
         return;  
     }
-    
-    // Default state: Physics OFF, InteractCollision OFF
-    // Physics and interaction are only enabled via SpawnDroppedWeapon or EnableWorldInteraction
-    if (EquipmentMesh)
-    {
-        EquipmentMesh->SetSimulatePhysics(false);
-        EquipmentMesh->SetEnableGravity(false);
-    }
-    if (InteractCollision)
-    {
-        InteractCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    }
+
+    // 콜리전 제어는 OnEquipped/OnUnequipped에서 담당
+    // (EquipmentSystem이 Equip/Unequip 시 호출)
 
     // Try to get character reference if attached
     AFFCharacter* OwnerRef = Cast<AFFCharacter>(GetAttachParentActor());
@@ -108,6 +99,43 @@ UMasterMagazine* AMasterWeapon::SwapMagazine(UMasterMagazine* NewMagazine)
 
     // 이전 탄창 반환 (호출자가 인벤토리로 복귀 처리)
     return OldMagazine;
+}
+
+void AMasterWeapon::OnEquipped()
+{
+    // 장착 시 콜리전 비활성화
+    if (EquipmentMesh)
+    {
+        EquipmentMesh->SetSimulatePhysics(false);
+        EquipmentMesh->SetEnableGravity(false);
+        EquipmentMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
+    if (InteractCollision)
+    {
+        InteractCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("MasterWeapon::OnEquipped - Collision disabled"));
+}
+
+void AMasterWeapon::OnUnequipped()
+{
+    // 장착 해제 시 Interactable 콜리전 프리셋 적용
+    if (EquipmentMesh)
+    {
+        EquipmentMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+        EquipmentMesh->SetCollisionProfileName(TEXT("PhysicsActor"));
+        EquipmentMesh->SetSimulatePhysics(true);
+        EquipmentMesh->SetEnableGravity(true);
+    }
+    
+    if (InteractCollision)
+    {
+        InteractCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        InteractCollision->SetCollisionProfileName(TEXT("Interactable"));
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("MasterWeapon::OnUnequipped - Collision enabled (Interactable)"));
 }
 
 AMasterWeapon* AMasterWeapon::SpawnDroppedWeapon(UWorld* World, UWeaponData* WeaponData, const FVector& Location, const FRotator& Rotation, AActor* Owner)
