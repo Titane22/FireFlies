@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "Gameplay/Data/ItemData.h"
 #include "Gameplay/Data/InventoryTypes.h"
+#include "Gameplay/Interfaces/Damageable.h"
 #include "FFCharacter.generated.h"
 
 class UInteractor;
@@ -17,8 +18,43 @@ class UPhysicalAnimationComponent;
 class AMasterWeapon;
 struct FInputActionValue;
 
+USTRUCT(BlueprintType)
+struct FInputState
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, Category = "State")
+	bool bWantsToSprint;
+	
+	UPROPERTY(BlueprintReadWrite, Category = "State")
+	bool bWantsToWalk;
+	
+	UPROPERTY(BlueprintReadWrite, Category = "State")
+	bool bWantsToStrafe;
+	
+	UPROPERTY(BlueprintReadWrite, Category = "State")
+	bool bWantsToAim;
+};
+
+UENUM(BlueprintType)
+enum class EGait : uint8
+{
+	Walk	UMETA(DisplayName = "Walk"),
+	Run		UMETA(DisplayName = "Run"),
+	Sprint	UMETA(DisplayName = "Sprint")
+};
+
+UENUM(BlueprintType)
+enum class ECameraStyle : uint8
+{
+	Far			UMETA(DisplayName = "Far"),
+	Balanced	UMETA(DisplayName = "Balanced"),
+	Close		UMETA(DisplayName = "Close"),
+	FirstPerson	UMETA(DisplayName = "FirstPerson"),
+};
+
 UCLASS()
-class FF_API AFFCharacter : public ACharacter
+class FF_API AFFCharacter : public ACharacter, public IDamageable
 {
 	GENERATED_BODY()
 
@@ -27,10 +63,37 @@ public:
 	AFFCharacter();
 	
 	UPhysicalAnimationComponent* GetPAC() const { return PAC; }
+	UHurtbox* GetHurtbox() const { return Hurtbox; }
 
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	virtual void FlashOnOff();
 
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Property Acess")
+	bool IsRagdolling() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Property Acess")
+	USkeletalMeshComponent* GetOverlaySkeletalMesh() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Property Acess")
+	UStaticMeshComponent* GetOverlayStaticMesh() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Property Acess")
+	float GetLandZVelocity() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Property Acess")
+	bool IsJustLanded() const;
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Overlay Pose")
+	void SetOverlayPose(int32 PoseIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "OverlayPose")
+	USkeletalMeshComponent* GetWeaponMesh() const;
+
+	virtual float TakeDamage_Implementation(float DamageAmount, const FPointDamageEvent& DamageEvent, const FName HitBoneName,
+					 AController* EventInstigator, AActor* DamageCauser) override;
+
+	virtual bool IsDead_Implementation() const override;
+	
 protected:
 	virtual void BeginPlay();
 
@@ -60,6 +123,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
 	UChildActorComponent* FlashlightChild;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ABP")
+	FInputState InputState_CPP;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ABP")
+	EGait Gait_CPP;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ABP")
+	ECameraStyle CameraStyle_CPP;
+	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	USceneComponent* Primary;
@@ -87,7 +159,11 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UInteractor* Interactor;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Equipment")
+	AMasterWeapon* CurrentWeapon;
 	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
 	bool bCanSwitchWeapon = true;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Combat")
@@ -111,9 +187,6 @@ protected:
 	/** 인벤토리 아이템 추가 시 호출 - 무기 자동 리로드 체크 */
 	UFUNCTION()
 	void OnInventoryItemAdded(const FItemSlot& AddedItem);
-
-	/** 현재 장착된 무기 반환 */
-	AMasterWeapon* GetCurrentWeapon() const;
 
 	/** 무기가 리로드 필요한지 확인 */
 	bool DoesWeaponNeedReload(AMasterWeapon* Weapon) const;

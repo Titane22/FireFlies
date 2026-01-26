@@ -50,7 +50,8 @@ bool UWeaponAttackSystem::ApplyHit(const FHitResult HitResult, float DamageAmoun
 	}
     
 	bool bIsDead = false;
-
+	GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow,
+			FString::Printf(TEXT("Hit Actor: %s"), HitActor ? *HitActor->GetName() : TEXT("NULL")));
 	if (HitActor->Implements<UDamageable>())
 	{
 		FPointDamageEvent DamageEvent(
@@ -59,7 +60,6 @@ bool UWeaponAttackSystem::ApplyHit(const FHitResult HitResult, float DamageAmoun
 			  -HitResult.ImpactNormal,      // ShotDirection (총알 방향)
 			  nullptr                       // DamageTypeClass
 		  );
-
 
 		APawn* OwnerPawn = CharacterRef;
 		AController* OwnerController = OwnerPawn ? OwnerPawn->GetController() : nullptr;

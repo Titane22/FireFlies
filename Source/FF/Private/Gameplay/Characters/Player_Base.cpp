@@ -34,7 +34,11 @@ void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputC
 		// EnhancedInputComponent->BindAction(SwitchHandgunAction, ETriggerEvent::Triggered, this, &APlayer_Base::SwitchToHandgunWeapon);
 
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &APlayer_Base::Reload);
+		// 발사 입력을 누름/뗌 모두 처리 (자동/반자동/버스트 공용)
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &APlayer_Base::ShootFire);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlayer_Base::ShootFire);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &APlayer_Base::ShootFire);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Canceled, this, &APlayer_Base::ShootFire);
 		EnhancedInputComponent->BindAction(InventoryAction, ETriggerEvent::Triggered, this, &APlayer_Base::Inventory);
 
 		// Interact actions - Hold support
@@ -208,12 +212,9 @@ void APlayer_Base::ShootFire(const FInputActionValue& Value)
 
 	const bool bPressed = Value.Get<bool>();
 
-	// 활(Secondary 슬롯, BowAttackSystem)일 경우: 누를 때 차지 시작, 뗄 때 발사
+	// 활(Secondary 슬롯)일 경우: 누르면 차지 시작, 떼면 발사
 	if (EquipmentSystem && EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Secondary)
 	{
-		if (!CanFire())
-			return;
-
 		AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(SecondaryChild->GetChildActor());
 		if (MasterWeapon && MasterWeapon->AttackSystem)
 		{
@@ -232,9 +233,12 @@ void APlayer_Base::ShootFire(const FInputActionValue& Value)
 		}
 	}
 
-	// 그 외 무기는 기존 총기 로직 유지 (누르는 동안 발사)
+	// 일반 총기: 누르면 발사 시작, 떼면 중단 (FullAuto는 타이머가 bFiring을 참조)
 	bFiring = bPressed;
-	HandleFiring();
+	if (bFiring)
+	{
+		HandleFiring();
+	}
 }
 
 void APlayer_Base::Reload()

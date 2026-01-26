@@ -544,7 +544,6 @@ UItemData* UInventorySystem::ConsumeArrow(FGameplayTag RequiredArrowTag)
 		UE_LOG(LogTemp, Warning, TEXT("[InventorySystem] ConsumeArrow: No arrows available"));
 		return nullptr;
 	}
-
 	UItemData* ArrowItemData = ArrowSlot->ItemData.Get();
 
 	// 수량 1 감소

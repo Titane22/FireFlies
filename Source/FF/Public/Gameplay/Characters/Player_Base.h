@@ -45,9 +45,6 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SwitchHandgunAction;
-
-	UPROPERTY(BlueprintReadWrite, Category = "Equipment")
-	AMasterWeapon* CurrentWeapon;
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
 	UW_MasterHUD* MasterHUD;

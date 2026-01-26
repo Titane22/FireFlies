@@ -4,6 +4,7 @@
 #include "Gameplay/Characters/FFCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "InputActionValue.h"
+#include "Engine/DamageEvents.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Gameplay/Components/HealthSystem.h"
 #include "Gameplay/Components/Hurtbox.h"
@@ -15,6 +16,8 @@
 #include "Gameplay/Items/Interaction/Interactor.h"
 #include "Gameplay/Data/MagazineData.h"
 #include "Gameplay/Data/WeaponData.h"
+#include "Perception/AISense_Damage.h"
+#include "PhysicsEngine/PhysicalAnimationComponent.h"
 
 // Sets default values
 AFFCharacter::AFFCharacter()
@@ -35,7 +38,8 @@ AFFCharacter::AFFCharacter()
 	Hurtbox = CreateDefaultSubobject<UHurtbox>("Hurtbox");
 	Interactor = CreateDefaultSubobject<UInteractor>("Interactor");
 	FlashlightChild = CreateDefaultSubobject<UChildActorComponent>("FlashlightChild");
-
+	PAC = CreateDefaultSubobject<UPhysicalAnimationComponent>("PhysicalAnimationComponent");
+	
 	Primary->SetupAttachment(RootComponent);
 	Secondary->SetupAttachment(RootComponent);
 	Handgun->SetupAttachment(RootComponent);
@@ -49,6 +53,56 @@ AFFCharacter::AFFCharacter()
 	EquippedChilds.Add(EEquipmentSlot::Primary, PrimaryChild);
 	EquippedChilds.Add(EEquipmentSlot::Secondary, SecondaryChild);
 	EquippedChilds.Add(EEquipmentSlot::Handgun, HandgunChild);
+}
+
+USkeletalMeshComponent* AFFCharacter::GetWeaponMesh() const
+{
+	if (!CurrentWeapon)
+		return nullptr;
+
+	return CurrentWeapon->EquipmentMesh;
+}
+
+float AFFCharacter::TakeDamage_Implementation(float DamageAmount, const FPointDamageEvent& DamageEvent, const FName HitBoneName,
+	AController* EventInstigator, AActor* DamageCauser)
+{
+	if (!HealthComponent || !Hurtbox)
+		return 0.f;
+	//GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, TEXT("HitActor2222222"));
+
+	FVector HitLocation = DamageEvent.HitInfo.ImpactPoint;
+	FVector HitDirection = DamageEvent.ShotDirection;
+	
+	// TODO: Procedural Hit Reaction 
+	//Hurtbox->TriggerHitReaction(HitLocation, HitDirection, HitBoneName, 1000.f);
+	
+	//float Multiplier = Hurtbox->GetDamageMultiplier(HitBoneName);
+	float ModifiedDamage = DamageAmount;
+	
+	HealthComponent->ApplyDamage(ModifiedDamage);
+	if (EventInstigator)
+	{
+		UAISense_Damage::ReportDamageEvent(
+			GetWorld(),
+			this,                              
+			EventInstigator,   
+			ModifiedDamage,
+			GetActorLocation(),                
+			GetActorLocation()                 
+		);
+	}
+	else
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Orange,
+			TEXT("Damage Event NOT Reported: EventInstigator or Character is NULL"));
+	}
+	
+	return ModifiedDamage;
+}
+
+bool AFFCharacter::IsDead_Implementation() const
+{
+	return HealthComponent && HealthComponent->IsDead();
 }
 
 void AFFCharacter::BeginPlay()
@@ -133,7 +187,6 @@ void AFFCharacter::BindInventoryDelegates()
 void AFFCharacter::OnInventoryItemAdded(const FItemSlot& AddedItem)
 {
 	// 현재 무기 확인
-	AMasterWeapon* CurrentWeapon = GetCurrentWeapon();
 	if (!CurrentWeapon)
 		return;
 
@@ -164,14 +217,6 @@ void AFFCharacter::OnInventoryItemAdded(const FItemSlot& AddedItem)
 		UE_LOG(LogTemp, Log, TEXT("FFCharacter: Auto-reload triggered by new magazine"));
 		CurrentWeapon->Reload();
 	}
-}
-
-AMasterWeapon* AFFCharacter::GetCurrentWeapon() const
-{
-	if (!EquipmentSystem)
-		return nullptr;
-
-	return EquipmentSystem->GetCurrentWeapon();
 }
 
 bool AFFCharacter::DoesWeaponNeedReload(AMasterWeapon* Weapon) const

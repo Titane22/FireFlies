@@ -2,6 +2,8 @@
 
 
 #include "Gameplay/Items/Equipments/BowAttackSystem.h"
+
+#include "Gameplay/Animations/ABP_Bow.h"
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
 #include "Gameplay/Items/InventorySystem.h"
 #include "Gameplay/Items/Projectiles/MasterProjectile.h"
@@ -178,14 +180,13 @@ void UBowAttackSystem::DestroySpawnedArrow()
 	}
 }
 
-void UBowAttackSystem::FireArrow()
+void UBowAttackSystem::FireArrow(float ChargeRatio)
 {
 	if (!SpawnedArrow || !CharacterRef || !OwnerWeapon || !OwnerWeapon->WeaponData)
 	{
 		UE_LOG(LogTemp, Error, TEXT("[BowAttackSystem] FireArrow: Invalid state"));
 		return;
 	}
-
 	// 인벤토리에서 화살 1개 소모
 	UInventorySystem* InventorySys = CharacterRef->FindComponentByClass<UInventorySystem>();
 	if (InventorySys)
@@ -235,7 +236,7 @@ void UBowAttackSystem::FireArrow()
 		}
 		// 부착 해제
 		SpawnedArrow->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-		SpawnedArrow->Fire(AimDirection);
+		SpawnedArrow->Fire(AimDirection, ChargeRatio);
 		
 		UE_LOG(LogTemp, Log, TEXT("[BowAttackSystem] FireArrow: Arrow fired"));
 
@@ -271,6 +272,24 @@ void UBowAttackSystem::StartCharge()
 
 	bIsCharging = true;
 	ChargeStartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	// 0.0 ~ 1.0 범위로 정규화 (MaxChargeTime 이상은 1.0으로 클램프)
+	
+	const float Now = GetWorld()->GetTimeSeconds();
+	const float HeldTime = FMath::Max(0.0f, Now - ChargeStartTime);
+	const float ChargeRatio = MaxChargeTime > 0.0f
+			? FMath::Clamp(HeldTime / MaxChargeTime, 0.0f, 1.0f)
+			: 1.0f;
+	// TODO: 현재 이 함수는 한 번 호출되므로 타임라인으로 빼서 값을 주는 것으로 하는게 좋을듯
+	if (OwnerWeapon && OwnerWeapon->EquipmentMesh)
+	{
+		if (UAnimInstance* AnimInst = OwnerWeapon->EquipmentMesh->GetAnimInstance())
+		{
+			if (UABP_Bow* BowAnimInstance = Cast<UABP_Bow>(AnimInst))
+			{
+				BowAnimInstance->DrawBow = 1.f;
+			}
+		}
+	}
 }
 
 void UBowAttackSystem::ReleaseCharge()
@@ -283,14 +302,22 @@ void UBowAttackSystem::ReleaseCharge()
 	if (!GetWorld())
 		return;
 
+	// 애니메이션 인스턴스에 비율 전달
+	if (OwnerWeapon && OwnerWeapon->EquipmentMesh)
+	{
+		if (UAnimInstance* AnimInst = OwnerWeapon->EquipmentMesh->GetAnimInstance())
+		{
+			if (UABP_Bow* BowAnimInstance = Cast<UABP_Bow>(AnimInst))
+			{
+				BowAnimInstance->DrawBow = 0.f;
+			}
+		}
+	}
 	const float Now = GetWorld()->GetTimeSeconds();
 	const float HeldTime = FMath::Max(0.0f, Now - ChargeStartTime);
-
-	// 0.0 ~ 1.0 범위로 정규화 (MaxChargeTime 이상은 1.0으로 클램프)
 	const float ChargeRatio = MaxChargeTime > 0.0f
-		? FMath::Clamp(HeldTime / MaxChargeTime, 0.0f, 1.0f)
-		: 1.0f;
-
+			? FMath::Clamp(HeldTime / MaxChargeTime, 0.0f, 1.0f)
+			: 1.0f;
 	// 화살 발사
 	FireArrow(ChargeRatio);
 }

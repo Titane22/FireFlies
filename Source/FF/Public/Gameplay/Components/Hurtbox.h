@@ -4,41 +4,57 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "PhysicsEngine/PhysicalAnimationComponent.h"
 #include "Hurtbox.generated.h"
 
 class AFFCharacter;
+class UPhysicalAnimationComponent;
+class USkeletalMeshComponent;
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class FF_API UHurtbox : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hurtbox")
-	TMap<FName, float> DamageMultipliers;
+	UHurtbox();
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	AFFCharacter* CharacterRef = nullptr;
 
-	UPROPERTY()
-	FTimerHandle RecoveryTimer;
-public:
 	UFUNCTION(BlueprintCallable, Category = "Hurtbox")
-	float GetDamageMultiplier(const FName HitBoneName) const;
+	float GetDamageMultiplier(FName BoneName) const;
 
-	void ApplyHitReaction(const FVector& HitLocation, const FVector& HitDirection, const FName BoneName, float Force);
-
+	/** 피격 시 호출 - Physical Animation 트리거 + Impulse */
 	UFUNCTION(BlueprintCallable, Category = "Hurtbox")
-	void RecoverFromHit();
-	
+	void TriggerHitReaction(const FVector& HitLocation, const FVector& HitDirection, FName BoneName, float ImpulseStrength = 500.f);
+
+protected:
+	virtual void BeginPlay() override;
+
 private:
-	FName ActivatedBoneName = NAME_None;
+	void DisablePhysicalAnimation(float DeltaTime);
 
-	UPROPERTY(EditAnywhere, Category = "Hurtbox|Hit Reaction")
-	float MinRecoveryTime = 0.3f;
+	UFUNCTION()
+	void PATrigger();
 
-	UPROPERTY(EditAnywhere, Category = "Hurtbox|Hit Reaction")
-	float MaxRecoveryTime = 1.5f;
+	UPROPERTY()
+	USkeletalMeshComponent* CachedMesh = nullptr;
 
-	UPROPERTY(EditAnywhere, Category = "Hurtbox|Hit Reaction")
-	float BasePhysicsBlendWeight = 0.3f;
+	UPROPERTY()
+	UPhysicalAnimationComponent* CachedPAC = nullptr;
+
+	// 상태 변수
+	bool bDisablePAC = false;
+	bool bDoOnceCompleted = false;
+	bool bFlipFlopState = false;  // FlipFlop: false=A, true=B
+	float CurrentBlendWeight = 1.f;
+
+	FTimerHandle PATriggerTimerHandle;
+
+	UPROPERTY(EditAnywhere, Category = "Hurtbox|Config")
+	float BlendInterpSpeed = 10.f;
+
+	UPROPERTY(EditAnywhere, Category = "Hurtbox|Config")
+	float TriggerDelay = 0.2f;
 };

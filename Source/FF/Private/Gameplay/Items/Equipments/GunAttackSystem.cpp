@@ -268,7 +268,11 @@ void UGunAttackSystem::FireBullet(FHitResult Hit, bool bReturnHit)
                 SpawnParams.Owner = OwnerWeapon;
                 SpawnParams.Instigator = OwnerWeapon->GetInstigator();
 
-                GetWorld()->SpawnActor<AActor>(OwnerWeapon->WeaponData->BulletTraceClass, SpawnTransform, SpawnParams);
+                AActor* SpawnedTrace = GetWorld()->SpawnActor<AActor>(OwnerWeapon->WeaponData->BulletTraceClass, SpawnTransform, SpawnParams);
+                if (SpawnedTrace)
+                {
+                    SpawnedTrace->SetLifeSpan(BulletTraceLifeSpan);
+                }
             }
         }
 
@@ -386,7 +390,16 @@ void UGunAttackSystem::FireBlankTracer()
 	FRotator Rotation = UKismetMathLibrary::MakeRotFromX(DirectionVector);
 
 	FTransform NewTransform(Rotation, SocketLocation, FVector(1.0f));
-	GetWorld()->SpawnActor<AActor>(OwnerWeapon->WeaponData->BulletTraceClass, NewTransform);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = OwnerWeapon;
+	SpawnParams.Instigator = OwnerWeapon->GetInstigator();
+
+	AActor* SpawnedTrace = GetWorld()->SpawnActor<AActor>(OwnerWeapon->WeaponData->BulletTraceClass, NewTransform, SpawnParams);
+	if (SpawnedTrace)
+	{
+		SpawnedTrace->SetLifeSpan(BulletTraceLifeSpan);
+	}
 }
 
 void UGunAttackSystem::PlayFireEffect()
@@ -576,8 +589,7 @@ void UGunAttackSystem::ExecuteFireSequence(const FHitResult& CameraHitResult)
 {
     FVector MuzzleLocation = OwnerWeapon->EquipmentMesh->GetSocketLocation(FName("Muzzle"));
     FVector DirectionToTarget = MuzzleLocation - CameraHitResult.Location;
-    GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow,
-        FString::Printf(TEXT("Hit Actor: %s"), CameraHitResult.GetActor() ? *CameraHitResult.GetActor()->GetName() : TEXT("NULL")));
+    
     // Perform muzzle trace
     FCollisionQueryParams QueryParams;
     QueryParams.AddIgnoredActor(OwnerWeapon);

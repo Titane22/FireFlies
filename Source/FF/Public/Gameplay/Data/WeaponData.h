@@ -112,7 +112,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "VFX")
 	TSubclassOf<AActor> BulletTraceClass;
-
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "VFX")
 	TSubclassOf<UUserWidget> HitMarkerUI;
 

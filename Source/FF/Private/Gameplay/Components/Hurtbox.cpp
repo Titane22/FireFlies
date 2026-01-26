@@ -1,120 +1,133 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Gameplay/Components/Hurtbox.h"
 #include "Gameplay/Characters/FFCharacter.h"
 #include "PhysicsEngine/PhysicalAnimationComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 
-float UHurtbox::GetDamageMultiplier(const FName HitBoneName) const
+UHurtbox::UHurtbox()
 {
-	// 기본 배율
-	float Multiplier = 1.0f;
-
-	// BoneName이 유효하고 DamageMultipliers에 등록되어 있으면 해당 배율 사용
-	if (!HitBoneName.IsNone() && DamageMultipliers.Contains(HitBoneName))
-	{
-		Multiplier = DamageMultipliers[HitBoneName];
-	}
-
-	return Multiplier;
+	PrimaryComponentTick.bCanEverTick = true;
 }
 
-void UHurtbox::ApplyHitReaction(const FVector& HitLocation, const FVector& HitDirection, const FName BoneName, float Force)
+void UHurtbox::BeginPlay()
 {
-	if (!CharacterRef)
-	{
-		UE_LOG(LogTemp, Error, TEXT("CharacterRef is NULL"));
-		return;
-	}
+	Super::BeginPlay();
 
-	UPhysicalAnimationComponent* PAC = CharacterRef->GetPAC();
-	if (!PAC)
-	{
-		UE_LOG(LogTemp, Error, TEXT("CharacterRef's PhysicalAnimationComponent is NULL"));
-		return;
-	}
+	// 약간의 딜레이 후 초기화 (컴포넌트들이 준비된 후)
+	FTimerHandle TimerHandle;
+	GetWorld()->GetTimerManager().SetTimer(
+		TimerHandle,
+		[this]()
+		{
+			if (CharacterRef)
+			{
+				CachedMesh = CharacterRef->GetMesh();
+				CachedPAC = CharacterRef->GetPAC();
 
-	USkeletalMeshComponent* Mesh = CharacterRef->GetMesh();
-	if (!Mesh)
-	{
-		UE_LOG(LogTemp, Error, TEXT("CharacterRef's Mesh is NULL"));
-		return;
-	}
-	
-	UWorld* World = CharacterRef->GetWorld();
-	if (!World)
-	{
-		UE_LOG(LogTemp, Error, TEXT("World is NULL"));
-		return;
-	}
-
-	// ✅ 단일 본만 물리 시뮬레이션 활성화
-	FBodyInstance* BodyInstance = Mesh->GetBodyInstance(BoneName);
-	if (!BodyInstance)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("No BodyInstance found for bone: %s"), *BoneName.ToString());
-		return;
-	}
-
-	// 해당 본만 물리 활성화 및 설정
-	BodyInstance->SetInstanceSimulatePhysics(true);
-	BodyInstance->SetEnableGravity(false);  // 중력 비활성화로 바닥에 쓰러지는 것 방지
-	BodyInstance->PhysicsBlendWeight = 0.2f;  // 물리 영향 최소화 (0.5 → 0.2)
-
-	// ✅ 단일 본에만 Physical Animation 적용 (강한 복원력)
-	FPhysicalAnimationData PhysAnimData;
-	PhysAnimData.bIsLocalSimulation = true;
-	PhysAnimData.OrientationStrength = 10000.0f;      // 애니메이션 포즈로 강하게 복귀
-	PhysAnimData.AngularVelocityStrength = 500.0f;   // 회전 속도 제어
-	PhysAnimData.PositionStrength = 10000.0f;         // 위치 복원력
-	PhysAnimData.VelocityStrength = 500.0f;          // 속도 제어
-	PhysAnimData.MaxLinearForce = 10000.0f;          // 최대 선형 힘
-	PhysAnimData.MaxAngularForce = 10000.0f;         // 최대 회전 힘
-
-	PAC->ApplyPhysicalAnimationSettings(BoneName, PhysAnimData);
-
-	// Z축 제거하여 공중으로 날아가는 것 방지
-	FVector SafeDir = HitDirection.GetSafeNormal();
-	SafeDir.Z = 0.0f;
-
-	// 임펄스 힘 감소 (500 → 100)
-	Mesh->AddImpulseAtLocation(SafeDir * (Force * 0.2f), HitLocation, BoneName);
-
-	ActivatedBoneName = BoneName;
-
-	World->GetTimerManager().SetTimer(
-		RecoveryTimer,
-		this,
-		&UHurtbox::RecoverFromHit,
-		0.5f
+				// if (CachedPAC && CachedMesh)
+				// {
+				// 	CachedPAC->SetSkeletalMeshComponent(CachedMesh);
+				//
+				// 	FPhysicalAnimationData PhysicalAnimationData;
+				// 	PhysicalAnimationData.bIsLocalSimulation = false;
+				// 	PhysicalAnimationData.OrientationStrength = 500.f;
+				// 	PhysicalAnimationData.AngularVelocityStrength = 100.f;
+				// 	PhysicalAnimationData.PositionStrength = 500.f;
+				// 	PhysicalAnimationData.VelocityStrength = 100.f;
+				// 	PhysicalAnimationData.MaxLinearForce = 0.f;
+				// 	PhysicalAnimationData.MaxAngularForce = 0.f;
+				// 	CachedPAC->ApplyPhysicalAnimationSettingsBelow(FName("spine_02"), PhysicalAnimationData, false);
+				//
+				// 	CachedMesh->SetAllBodiesBelowSimulatePhysics(FName("spine_02"), true, true);
+				// }
+			}
+		},
+		0.1f,
+		false
 	);
 }
 
-void UHurtbox::RecoverFromHit()
+void UHurtbox::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
-	if (!CharacterRef)
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	// Branch: bDisablePAC가 true면 DisablePhysicalAnimation 실행
+	if (bDisablePAC)
 	{
-		UE_LOG(LogTemp, Error, TEXT("CharacterRef is NULL"));
+		DisablePhysicalAnimation(DeltaTime);
+	}
+}
+
+void UHurtbox::DisablePhysicalAnimation(float DeltaTime)
+{
+	GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Green, TEXT("Called"));
+	if (!CachedMesh)
 		return;
-	}
 
-	UPhysicalAnimationComponent* PAC = CharacterRef->GetPAC();
-	if (!PAC) return;
-
-	USkeletalMeshComponent* Mesh = CharacterRef->GetMesh();
-	if (!Mesh) return;
-
-	// ✅ 해당 본만 물리 해제 및 블렌드 가중치 복구
-	FBodyInstance* BodyInstance = Mesh->GetBodyInstance(ActivatedBoneName);
-	if (BodyInstance)
+	// PhysicsBlendWeight를 1에서 0으로 서서히 감소
+	CurrentBlendWeight = FMath::FInterpTo(CurrentBlendWeight, 0.f, DeltaTime, BlendInterpSpeed);
+	CachedMesh->SetAllBodiesBelowPhysicsBlendWeight(FName("spine_02"), CurrentBlendWeight, false, false);
+	GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, TEXT("Called"));
+	// Do Once: BlendWeight가 거의 0에 도달하면 타이머 설정
+	if (CurrentBlendWeight <= 0.01f && !bDoOnceCompleted)
 	{
-		BodyInstance->SetInstanceSimulatePhysics(false);
-		BodyInstance->PhysicsBlendWeight = 0.0f;
+		bDoOnceCompleted = true;
+		GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, TEXT("Called"));
+		// Set Timer by Function Name - 0.2초 후 PATrigger 호출
+		GetWorld()->GetTimerManager().SetTimer(
+			PATriggerTimerHandle,
+			this,
+			&UHurtbox::PATrigger,
+			TriggerDelay,
+			false  // Looping = false
+		);
+	}
+}
+
+void UHurtbox::PATrigger()
+{
+	// Flip Flop 로직 (먼저 체크, 나중에 토글)
+	if (!bFlipFlopState)
+	{
+		// A 경로 (첫 번째 호출): Disable PA = true
+		bDisablePAC = true;
+	}
+	else
+	{
+		// B 경로 (두 번째 호출): Disable PA = false
+		bDisablePAC = false;
 	}
 
-	// Physical Animation 제거
-	FPhysicalAnimationData EmptyData;
-	PAC->ApplyPhysicalAnimationSettings(ActivatedBoneName, EmptyData);
+	bFlipFlopState = !bFlipFlopState;  // 토글은 마지막에
+	bDoOnceCompleted = false;
+}
 
-	ActivatedBoneName = NAME_None;
+void UHurtbox::TriggerHitReaction(const FVector& HitLocation, const FVector& HitDirection, FName BoneName, float ImpulseStrength)
+{
+	if (!CachedMesh)
+		return;
+
+	// 물리 시뮬레이션 활성화 (Impulse 적용에 필수)
+	CachedMesh->SetAllBodiesBelowSimulatePhysics(FName("spine_02"), true, true);
+
+	// BlendWeight 리셋 (물리 영향 최대)
+	CurrentBlendWeight = 1.f;
+	CachedMesh->SetAllBodiesBelowPhysicsBlendWeight(FName("spine_02"), 1.f, false, true);
+
+	// Impulse 적용
+	FVector Impulse = HitDirection.GetSafeNormal() * ImpulseStrength;
+	CachedMesh->AddImpulseAtLocation(Impulse, HitLocation, BoneName);
+
+	// PATrigger 호출 → bDisablePAC = true → Tick에서 BlendWeight 감소 시작
+	PATrigger();
+}
+
+//==============================================================================
+// 데미지 배율
+//==============================================================================
+
+float UHurtbox::GetDamageMultiplier(FName BoneName) const
+{
+	return 1.f;
 }
