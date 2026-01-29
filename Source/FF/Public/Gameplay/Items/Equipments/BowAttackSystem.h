@@ -60,9 +60,6 @@ protected:
 	void FireArrow(float ChargeRatio);
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	AMasterWeapon* OwnerWeapon = nullptr;
-
 	/** 캐릭터 메쉬의 화살 소켓 이름 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bow|Arrow")
 	FName ArrowSocketName = FName("arrow_socket");

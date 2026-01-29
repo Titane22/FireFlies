@@ -94,6 +94,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
 	TSubclassOf<AMasterWeapon> HandgunWeaponClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	TSubclassOf<AMasterWeapon> MeleeWeaponClass;
+	
 	// 현재 장착된 무기 슬롯 (None = 맨손)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	EEquipmentSlot CurrentEquippedSlot;

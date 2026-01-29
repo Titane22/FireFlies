@@ -175,6 +175,10 @@ void APlayer_Base::UpdateWeaponUI(UWeaponData* WeaponData)
 	{
 		Weapon = Cast<AMasterWeapon>(HandgunChild->GetChildActor());
 	}
+	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Melee)
+	{
+		Weapon = Cast<AMasterWeapon>(MeleeChildActor->GetChildActor());
+	}
 	else
 	{
 		PlayerHUD->HideWeaponUI();
@@ -207,10 +211,21 @@ void APlayer_Base::UpdateWeaponUI(UWeaponData* WeaponData)
 
 void APlayer_Base::ShootFire(const FInputActionValue& Value)
 {
+	const bool bPressed = Value.Get<bool>();
+	if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Melee)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Orange, TEXT("Called"));
+		if (bPressed)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Cyan, TEXT("Called"));
+			AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(MeleeChildActor->GetChildActor());
+			MasterWeapon->Attack();
+		}
+		return;
+	}
 	if (!bIsAiming)
 		return;
 
-	const bool bPressed = Value.Get<bool>();
 
 	// 활(Secondary 슬롯)일 경우: 누르면 차지 시작, 떼면 발사
 	if (EquipmentSystem && EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Secondary)
@@ -232,7 +247,7 @@ void APlayer_Base::ShootFire(const FInputActionValue& Value)
 			}
 		}
 	}
-
+	
 	// 일반 총기: 누르면 발사 시작, 떼면 중단 (FullAuto는 타이머가 bFiring을 참조)
 	bFiring = bPressed;
 	if (bFiring)
@@ -271,17 +286,9 @@ void APlayer_Base::Reload()
 	MasterWeapon->Reload();
 }
 
-bool APlayer_Base::CanFire()
-{
-	bool bCanJumpNow = CanJump();  // 한 번만 호출하고 저장
-	bool bCanShoot = !IsSprint && !bIsDodging && bCanJumpNow && bCanSwitchWeapon;
-	
-	return bCanShoot;
-}
-
 void APlayer_Base::HandleFiring()
 {
-	if (!EquipmentSystem || !bFiring || !bCanFire || !CanFire())
+	if (!EquipmentSystem || !bFiring || !CanAttack())
 		return;
 
 	if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Primary)
@@ -308,7 +315,7 @@ void APlayer_Base::ReadyToFire(AMasterWeapon* MasterWeapon, UWeaponData* Current
 	if (!MasterWeapon || !CurrentWeaponDataAsset)
 		return;
 	// TODO: GunAttackComponent인지 체크
-	bCanFire = false;
+	bCanAttack = false;
 	MasterWeapon->Attack();
 	
 	APlayerController* PC = Cast<APlayerController>(GetController());
@@ -334,7 +341,7 @@ void APlayer_Base::ReadyToFire(AMasterWeapon* MasterWeapon, UWeaponData* Current
 			TimerHandle,
 			[this]()
 			{
-				bCanFire = true;
+				bCanAttack = true;
 				HandleFiring();
 			},
 			FireDelay,
@@ -346,7 +353,7 @@ void APlayer_Base::ReadyToFire(AMasterWeapon* MasterWeapon, UWeaponData* Current
 			TimerHandle,
 			[this]()
 			{
-				bCanFire = true;
+				bCanAttack = true;
 			},
 			FireDelay,
 			false

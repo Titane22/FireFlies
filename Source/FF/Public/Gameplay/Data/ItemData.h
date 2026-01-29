@@ -17,7 +17,8 @@ enum class EEquipmentSlot : uint8
 	None			UMETA(DisplayName = "None"),      // 맨손 상태
 	Primary			UMETA(DisplayName = "Primary"),
 	Secondary		UMETA(DisplayName = "Secondary"),
-	Handgun			UMETA(DisplayName = "Handgun")
+	Handgun			UMETA(DisplayName = "Handgun"),
+	Melee			UMETA(DisplayName = "Melee")
 };
 
 

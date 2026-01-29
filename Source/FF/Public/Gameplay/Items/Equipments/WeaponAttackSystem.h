@@ -7,6 +7,7 @@
 #include "WeaponAttackSystem.generated.h"
 
 class AFFCharacter;
+class AMasterWeapon;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class FF_API UWeaponAttackSystem : public UActorComponent
@@ -51,7 +52,10 @@ public:
 public:
 	UPROPERTY()
 	AFFCharacter* CharacterRef = nullptr;
-
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
+	AMasterWeapon* OwnerWeapon = nullptr;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
 	bool bReloading = false;
 	

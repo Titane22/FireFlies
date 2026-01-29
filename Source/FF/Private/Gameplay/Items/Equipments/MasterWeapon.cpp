@@ -110,6 +110,13 @@ void AMasterWeapon::OnEquipped()
         EquipmentMesh->SetEnableGravity(false);
         EquipmentMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     }
+    if (EquipmentStaticMesh)
+    {
+        EquipmentStaticMesh->SetSimulatePhysics(false);
+        EquipmentStaticMesh->SetEnableGravity(false);
+        EquipmentStaticMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
+    
     if (InteractCollision)
     {
         InteractCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);

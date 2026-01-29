@@ -45,6 +45,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SwitchHandgunAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* SwitchMeleeAction;
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
 	UW_MasterHUD* MasterHUD;
@@ -73,8 +76,6 @@ protected:
 	void ShootFire(const FInputActionValue& Value);
 
 	void Reload();
-	
-	bool CanFire();
 
 	void HandleFiring();
 	void ReadyToFire(AMasterWeapon* MasterWeapon, UWeaponData* CurrentWeaponDataAsset);

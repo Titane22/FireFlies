@@ -61,7 +61,7 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData, bool bSho
 		UE_LOG(LogTemp, Warning, TEXT("[Equip] - Target Child is NULL for slot %d"), (int32)Slot);
 		return;
 	}
-
+	
 	UChildActorComponent* TargetChild = *TargetChildPtr;
 	// 2. 타겟 Child Actor에 등록하기
 	SetChildActorForSlot(Slot, TargetChild);
@@ -69,15 +69,13 @@ void UEquipmentSystem::Equip(EEquipmentSlot Slot, UItemData* ItemData, bool bSho
 	if (!TargetChild->GetChildActor() && EquipSlot.EquipmentClass)
 	{
 		TargetChild->SetChildActorClass(EquipSlot.EquipmentClass);
-		if (TargetChild->IsRegistered())
+		// 등록되지 않았으면 등록
+		if (!TargetChild->IsRegistered())
 		{
-			TargetChild->CreateChildActor();
+			TargetChild->RegisterComponent();
 		}
-		else
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, TEXT("TargetChild is Not Registered"));
-		}
-		
+
+		TargetChild->CreateChildActor();
 		// 장착 시 콜리전 비활성화
 		if (AMasterWeapon* Weapon = Cast<AMasterWeapon>(TargetChild->GetChildActor()))
 		{
@@ -473,6 +471,10 @@ bool UEquipmentSystem::PickupAndEquipWeapon(TSubclassOf<AMasterWeapon> NewWeapon
 	else if (TargetSlot == EEquipmentSlot::Handgun)
 	{
 		HandgunWeaponClass = NewWeaponClass;
+	}
+	else if (TargetSlot == EEquipmentSlot::Melee)
+	{
+		MeleeWeaponClass = NewWeaponClass;
 	}
 
 	CurrentWeaponClass = NewWeaponClass;

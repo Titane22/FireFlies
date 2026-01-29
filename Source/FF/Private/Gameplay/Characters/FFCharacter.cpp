@@ -28,9 +28,11 @@ AFFCharacter::AFFCharacter()
 	Primary = CreateDefaultSubobject<USceneComponent>("Primary");
 	Secondary = CreateDefaultSubobject<USceneComponent>("Secondary");
 	Handgun = CreateDefaultSubobject<USceneComponent>("Handgun");
+	MeleeScene = CreateDefaultSubobject<USceneComponent>("Melee Scene");
 	PrimaryChild = CreateDefaultSubobject<UChildActorComponent>("PrimaryChild");
 	SecondaryChild = CreateDefaultSubobject<UChildActorComponent>("SecondaryChild");
 	HandgunChild = CreateDefaultSubobject<UChildActorComponent>("HandgunChild");
+	MeleeChildActor = CreateDefaultSubobject<UChildActorComponent>("Melee Child Actor");
 	
 	EquipmentSystem = CreateDefaultSubobject<UEquipmentSystem>("EquipmentSystem");
 	InventorySystem = CreateDefaultSubobject<UInventorySystem>("InventorySystem");
@@ -43,16 +45,14 @@ AFFCharacter::AFFCharacter()
 	Primary->SetupAttachment(RootComponent);
 	Secondary->SetupAttachment(RootComponent);
 	Handgun->SetupAttachment(RootComponent);
+	MeleeScene->SetupAttachment(RootComponent);
 	PrimaryChild->SetupAttachment(Primary);
 	SecondaryChild->SetupAttachment(Secondary);
 	HandgunChild->SetupAttachment(Handgun);
+	MeleeChildActor->SetupAttachment(MeleeScene);
 	FlashlightChild->SetupAttachment(RootComponent);
 
 	SecondaryChild->RegisterComponentWithWorld(GetWorld());
-	
-	EquippedChilds.Add(EEquipmentSlot::Primary, PrimaryChild);
-	EquippedChilds.Add(EEquipmentSlot::Secondary, SecondaryChild);
-	EquippedChilds.Add(EEquipmentSlot::Handgun, HandgunChild);
 }
 
 USkeletalMeshComponent* AFFCharacter::GetWeaponMesh() const
@@ -63,8 +63,16 @@ USkeletalMeshComponent* AFFCharacter::GetWeaponMesh() const
 	return CurrentWeapon->EquipmentMesh;
 }
 
+UStaticMeshComponent* AFFCharacter::GetWeaponStaticMesh() const
+{
+	if (!CurrentWeapon)
+		return nullptr;
+	
+	return CurrentWeapon->EquipmentStaticMesh;
+}
+
 float AFFCharacter::TakeDamage_Implementation(float DamageAmount, const FPointDamageEvent& DamageEvent, const FName HitBoneName,
-	AController* EventInstigator, AActor* DamageCauser)
+                                              AController* EventInstigator, AActor* DamageCauser)
 {
 	if (!HealthComponent || !Hurtbox)
 		return 0.f;
@@ -108,6 +116,25 @@ bool AFFCharacter::IsDead_Implementation() const
 void AFFCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	EquippedChilds.Add(EEquipmentSlot::Primary, PrimaryChild);
+	EquippedChilds.Add(EEquipmentSlot::Secondary, SecondaryChild);
+	EquippedChilds.Add(EEquipmentSlot::Handgun, HandgunChild);
+	EquippedChilds.Add(EEquipmentSlot::Melee, MeleeChildActor);
+	
+	// 미등록 ChildActorComponent 강제 등록
+	for (const auto& Pair : EquippedChilds)
+	{
+		UChildActorComponent* Child = Pair.Value;
+		if (Child && !Child->IsRegistered())
+		{
+			Child->RegisterComponent();
+			UE_LOG(LogTemp, Log, TEXT("[FFCharacter] Manually registered %s (Success: %s)"),
+				*Child->GetName(),
+				Child->IsRegistered() ? TEXT("Yes") : TEXT("No"));
+		}
+	}
+
 	if (EquipmentSystem)
 	{
 		EquipmentSystem->CharacterRef = this;
@@ -136,6 +163,7 @@ void AFFCharacter::BeginPlay()
 		{
 			EEquipmentSlot Slot = DefaultEquip.Key;
 			UItemData* ItemData = DefaultEquip.Value;
+			
 			if (ItemData)
 			{
 				EquipmentSystem->Equip(Slot, ItemData);
@@ -231,3 +259,10 @@ bool AFFCharacter::DoesWeaponNeedReload(AMasterWeapon* Weapon) const
 	return !Weapon->CurrentMagazine->HasAmmo();
 }
 
+bool AFFCharacter::CanAttack()
+{
+	bool bCanJumpNow = CanJump();  // 한 번만 호출하고 저장
+	bool bCanShoot = !IsSprint && !bIsDodging && bCanJumpNow && bCanSwitchWeapon && bCanAttack;
+	
+	return bCanShoot;
+}

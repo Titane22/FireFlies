@@ -28,6 +28,22 @@ enum class EFireMode : uint8
 	Burst       UMETA(DisplayName = "Burst")
 };
 
+
+USTRUCT(BlueprintType)
+struct FComboAttack
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Combo")
+	UAnimMontage* AnimMontage;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Combo")
+	float DamageMultiplier = 1.f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Combo")
+	float AttackSpeedRate = 1.f;
+};
+
 /**
  * Weapon-specific data that extends the base ItemData
  */
@@ -120,4 +136,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ammo")
 	FGameplayTag RequiredAmmoType;
 
+	// Melee Combat
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Melee")
+	TArray<FComboAttack> ComboAttacks;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Melee")
+	float HitRadius;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
+	FName SweepStartSocket;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
+	FName SweepEndSocket;
 };

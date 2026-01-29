@@ -65,9 +65,6 @@ private:
 	void ExecuteFireSequence(const FHitResult& CameraHitResult);
 	
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	AMasterWeapon* OwnerWeapon = nullptr;
-
 	/** 총알 궤적 Actor의 최대 생존 시간 (초) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|BulletTrace")
 	float BulletTraceLifeSpan = 3.0f;

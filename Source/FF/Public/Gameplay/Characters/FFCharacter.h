@@ -89,11 +89,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "OverlayPose")
 	USkeletalMeshComponent* GetWeaponMesh() const;
 
+	UFUNCTION(BlueprintCallable, Category = "OverlayPose")
+	UStaticMeshComponent* GetWeaponStaticMesh() const;
+	
 	virtual float TakeDamage_Implementation(float DamageAmount, const FPointDamageEvent& DamageEvent, const FName HitBoneName,
 					 AController* EventInstigator, AActor* DamageCauser) override;
 
 	virtual bool IsDead_Implementation() const override;
 	
+	bool CanAttack();
+
+	AMasterWeapon* GetCurrentWeapon() const { return CurrentWeapon; }
 protected:
 	virtual void BeginPlay();
 
@@ -120,6 +126,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon", meta = (AllowPrivateAccess = "true"))
 	UChildActorComponent* HandgunChild;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon", meta = (AllowPrivateAccess = "true"))
+	UChildActorComponent* MeleeChildActor;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
 	UChildActorComponent* FlashlightChild;
 
@@ -131,6 +140,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ABP")
 	ECameraStyle CameraStyle_CPP;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Equipment|Action")
+	bool bIsAiming;
 	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
@@ -141,6 +153,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	USceneComponent* Handgun;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	USceneComponent* MeleeScene;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UPhysicalAnimationComponent* PAC;
@@ -169,10 +184,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Combat")
 	bool bFiring;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Equipment|Action")
-	bool bIsAiming;
-
-	bool bCanFire = true;
+	bool bCanAttack = true;
 
 	bool IsCrouch;
 

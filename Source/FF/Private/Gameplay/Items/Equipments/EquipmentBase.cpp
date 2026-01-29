@@ -3,6 +3,8 @@
 
 #include "Gameplay/Items/Equipments/EquipmentBase.h"
 
+#include "Misc/MapErrors.h"
+
 // Sets default values
 AEquipmentBase::AEquipmentBase()
 {
@@ -10,13 +12,17 @@ AEquipmentBase::AEquipmentBase()
 	PrimaryActorTick.bCanEverTick = true;
 
 	DefaultRoot = CreateDefaultSubobject<USceneComponent>("DefaultRoot");
-	EquipmentMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("EquipmentMesh"));
+	EquipmentMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Equipment Skeletal Mesh"));
+	EquipmentStaticMesh = CreateDefaultSubobject<UStaticMeshComponent>("Equipment Static Mesh");
 	InteractCollision = CreateDefaultSubobject<USphereComponent>(TEXT("InteractCollision"));
 
 	// Setting up the component hierarchy
 	RootComponent = DefaultRoot;
 	EquipmentMesh->SetupAttachment(RootComponent);
 	EquipmentMesh->SetCollisionProfileName(FName("PhysicsActor"));
+
+	EquipmentStaticMesh->SetupAttachment(RootComponent);
+	EquipmentStaticMesh->SetCollisionProfileName(FName("PhysicsActor"));
 	
 	InteractCollision->SetupAttachment(EquipmentMesh);
 	InteractCollision->SetCollisionProfileName(FName("Interactable"));
