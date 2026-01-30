@@ -3,7 +3,6 @@
 
 #include "Gameplay/Characters/Player_Base.h"
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
-#include "Gameplay/Items/Equipments/BowAttackSystem.h"
 #include "Gameplay/Items/EquipmentSystem.h"
 #include "Gameplay/Items/InventorySystem.h"
 #include "Gameplay/Items/Interaction/Interactor.h"
@@ -34,11 +33,11 @@ void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputC
 		// EnhancedInputComponent->BindAction(SwitchHandgunAction, ETriggerEvent::Triggered, this, &APlayer_Base::SwitchToHandgunWeapon);
 
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered, this, &APlayer_Base::Reload);
-		// 발사 입력을 누름/뗌 모두 처리 (자동/반자동/버스트 공용)
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &APlayer_Base::ShootFire);
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlayer_Base::ShootFire);
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &APlayer_Base::ShootFire);
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Canceled, this, &APlayer_Base::ShootFire);
+		// 공격 입력 라우팅
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &APlayer_Base::OnAttackStarted);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlayer_Base::OnAttackHeld);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &APlayer_Base::OnAttackReleased);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Canceled, this, &APlayer_Base::OnAttackReleased);
 		EnhancedInputComponent->BindAction(InventoryAction, ETriggerEvent::Triggered, this, &APlayer_Base::Inventory);
 
 		// Interact actions - Hold support
@@ -209,50 +208,27 @@ void APlayer_Base::UpdateWeaponUI(UWeaponData* WeaponData)
 	);
 }
 
-void APlayer_Base::ShootFire(const FInputActionValue& Value)
+void APlayer_Base::OnAttackStarted(const FInputActionValue& Value)
 {
-	const bool bPressed = Value.Get<bool>();
-	if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Melee)
+	if (CurrentWeapon)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Orange, TEXT("Called"));
-		if (bPressed)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Cyan, TEXT("Called"));
-			AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(MeleeChildActor->GetChildActor());
-			MasterWeapon->Attack();
-		}
-		return;
+		CurrentWeapon->OnAttackStarted();
 	}
-	if (!bIsAiming)
-		return;
+}
 
-
-	// 활(Secondary 슬롯)일 경우: 누르면 차지 시작, 떼면 발사
-	if (EquipmentSystem && EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Secondary)
+void APlayer_Base::OnAttackHeld(const FInputActionValue& Value)
+{
+	if (CurrentWeapon)
 	{
-		AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(SecondaryChild->GetChildActor());
-		if (MasterWeapon && MasterWeapon->AttackSystem)
-		{
-			if (UBowAttackSystem* BowSystem = Cast<UBowAttackSystem>(MasterWeapon->AttackSystem))
-			{
-				if (bPressed)
-				{
-					BowSystem->StartCharge();
-				}
-				else
-				{
-					BowSystem->ReleaseCharge();
-				}
-				return;
-			}
-		}
+		CurrentWeapon->OnAttackHeld();
 	}
-	
-	// 일반 총기: 누르면 발사 시작, 떼면 중단 (FullAuto는 타이머가 bFiring을 참조)
-	bFiring = bPressed;
-	if (bFiring)
+}
+
+void APlayer_Base::OnAttackReleased(const FInputActionValue& Value)
+{
+	if (CurrentWeapon)
 	{
-		HandleFiring();
+		CurrentWeapon->OnAttackReleased();
 	}
 }
 
@@ -284,82 +260,6 @@ void APlayer_Base::Reload()
 		return;
 
 	MasterWeapon->Reload();
-}
-
-void APlayer_Base::HandleFiring()
-{
-	if (!EquipmentSystem || !bFiring || !CanAttack())
-		return;
-
-	if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Primary)
-	{
-		AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(PrimaryChild->GetChildActor());
-		UWeaponData* CurrentWeaponDataAsset = MasterWeapon->WeaponData;
-		ReadyToFire(MasterWeapon, CurrentWeaponDataAsset);
-	}
-	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Secondary)
-	{
-		AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(SecondaryChild->GetChildActor());
-		MasterWeapon->Attack();
-	}
-	else if (EquipmentSystem->CurrentEquippedSlot == EEquipmentSlot::Handgun)
-	{
-		AMasterWeapon* MasterWeapon = Cast<AMasterWeapon>(HandgunChild->GetChildActor());
-		UWeaponData* CurrentWeaponDataAsset = MasterWeapon->WeaponData;
-		ReadyToFire(MasterWeapon, CurrentWeaponDataAsset);
-	}
-}
-
-void APlayer_Base::ReadyToFire(AMasterWeapon* MasterWeapon, UWeaponData* CurrentWeaponDataAsset)
-{
-	if (!MasterWeapon || !CurrentWeaponDataAsset)
-		return;
-	// TODO: GunAttackComponent인지 체크
-	bCanAttack = false;
-	MasterWeapon->Attack();
-	
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (PC)
-	{
-		APlayerHUD* PlayerHUD = Cast<APlayerHUD>(PC->GetHUD());
-		if (PlayerHUD)
-		{
-			PlayerHUD->UpdateWeaponAmmo(
-				MasterWeapon->GetMaxAmmo(),
-				MasterWeapon->GetCurrentAmmo());
-		}
-	}
-
-	float FireDelay = CurrentWeaponDataAsset->FireRate;
-	EFireMode CurrentFireMode = CurrentWeaponDataAsset->FireMode;
-	FTimerHandle TimerHandle;
-
-	switch (CurrentFireMode)
-	{
-	case EFireMode::FullAuto:
-		GetWorld()->GetTimerManager().SetTimer(
-			TimerHandle,
-			[this]()
-			{
-				bCanAttack = true;
-				HandleFiring();
-			},
-			FireDelay,
-			false
-		);
-		break;
-	default:
-		GetWorld()->GetTimerManager().SetTimer(
-			TimerHandle,
-			[this]()
-			{
-				bCanAttack = true;
-			},
-			FireDelay,
-			false
-		);
-		break;
-	}
 }
 
 void APlayer_Base::OnMontageEnded(UAnimMontage* Montage, bool bInterrupted)

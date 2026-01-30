@@ -42,10 +42,13 @@ public:
 	
 	bool GetWeaponTracePoints(FVector& OutStart, FVector& OutEnd) const;
 
-	void OnWeaponHit(FHitResult& HitResult);
+	bool OnWeaponHit(AActor* HitActor);
 
 	void SetComboState(EMeleeAttackType State, bool bEnable);
 	void ResetCombo();
+
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	bool TryInterruptAttack();
 
 	bool bCanCombo = false;
 	bool bCanBeInterrupted = false;
@@ -73,6 +76,9 @@ protected:
 	FName WeaponSweepEndSocket;
 
 	float WeaponRadius;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|MotionWarping")
+	float WarpTargetOffset = 100.f;
 	
 	TArray<FComboAttack> ComboAttacks;
 
@@ -81,6 +87,7 @@ protected:
 	FTimerHandle TimerFallingCheck;
 
 	bool bWeaponSweepActive = false;
+	bool bIsExecutingQueued = false;
 private:
 	bool CanAttack();
 

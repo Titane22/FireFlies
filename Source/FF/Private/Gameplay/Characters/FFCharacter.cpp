@@ -80,8 +80,9 @@ float AFFCharacter::TakeDamage_Implementation(float DamageAmount, const FPointDa
 
 	FVector HitLocation = DamageEvent.HitInfo.ImpactPoint;
 	FVector HitDirection = DamageEvent.ShotDirection;
-	
-	// TODO: Procedural Hit Reaction 
+
+	Hurtbox->MeleeHitReaction(HitLocation, HitDirection);
+	// TODO: Procedural Hit Reaction & 무기에 따른 브랜치(수류탄 등)
 	//Hurtbox->TriggerHitReaction(HitLocation, HitDirection, HitBoneName, 1000.f);
 	
 	//float Multiplier = Hurtbox->GetDamageMultiplier(HitBoneName);
@@ -261,8 +262,5 @@ bool AFFCharacter::DoesWeaponNeedReload(AMasterWeapon* Weapon) const
 
 bool AFFCharacter::CanAttack()
 {
-	bool bCanJumpNow = CanJump();  // 한 번만 호출하고 저장
-	bool bCanShoot = !IsSprint && !bIsDodging && bCanJumpNow && bCanSwitchWeapon && bCanAttack;
-	
-	return bCanShoot;
+	return !IsSprint && !bIsDodging && CanJump() && bCanSwitchWeapon;
 }

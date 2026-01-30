@@ -6,10 +6,10 @@
 #include "Gameplay/Characters/FFCharacter.h"
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
 #include "Gameplay/Items/Equipments/MeleeAttackSystem.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 UANS_WeaponTrace::UANS_WeaponTrace()
 {
-	TraceChannel = ECC_Pawn;
 	bDrawDebug = true;
 	DebugDrawTime = 2.0f;
 	DebugLineThickness = 3.0f;
@@ -74,88 +74,45 @@ void UANS_WeaponTrace::NotifyTick(USkeletalMeshComponent* MeshComp, UAnimSequenc
 
 	float Radius = CombatComp->GetWeaponSweepRadius();
 
-	// Sphere Sweep Trace 수행
-	FHitResult HitResult;
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(Character);
-	QueryParams.bTraceComplex = false;
+	// 무기 블레이드 전체를 커버하는 Sphere Overlap
+	FVector Mid = (Start + End) * 0.5f;
+	float OverlapRadius = FVector::Dist(Start, End) * 0.5f + Radius;
 
-	bool bHit = World->SweepSingleByChannel(
-		HitResult,
-		Start,
-		End,
-		FQuat::Identity,
-		TraceChannel,
-		FCollisionShape::MakeSphere(Radius),
-		QueryParams
+	TArray<AActor*> IgnoreActors;
+	IgnoreActors.Add(Character);
+
+	TArray<AActor*> OverlappedActors;
+	UKismetSystemLibrary::SphereOverlapActors(
+		World,
+		Mid,
+		OverlapRadius,
+		ObjectTypes,
+		nullptr,
+		IgnoreActors,
+		OverlappedActors
 	);
-
+	
 	// 디버그 드로우
 	if (bDrawDebug)
 	{
-		// 무기 궤적 라인
-		DrawDebugLine(
-			World,
-			Start,
-			End,
-			FColor::Red,
-			false,
-			DebugDrawTime,
-			0,
-			DebugLineThickness
-		);
-
-		// 시작점 구체
-		DrawDebugSphere(
-			World,
-			Start,
-			Radius,
-			12,
-			FColor::Green,
-			false,
-			DebugDrawTime,
-			0,
-			1.0f
-		);
-
-		// 끝점 구체
-		DrawDebugSphere(
-			World,
-			End,
-			Radius,
-			12,
-			FColor::Blue,
-			false,
-			DebugDrawTime,
-			0,
-			1.0f
-		);
-
-		// 히트 지점 표시
-		if (bHit)
-		{
-			DrawDebugSphere(
-				World,
-				HitResult.ImpactPoint,
-				Radius * 1.5f,
-				12,
-				FColor::Yellow,
-				false,
-				DebugDrawTime,
-				0,
-				2.0f
-			);
-		}
+		DrawDebugLine(World, Start, End, FColor::Red, false, DebugDrawTime, 0, DebugLineThickness);
+		DrawDebugSphere(World, Start, Radius, 12, FColor::Green, false, DebugDrawTime, 0, 1.0f);
+		DrawDebugSphere(World, End, Radius, 12, FColor::Blue, false, DebugDrawTime, 0, 1.0f);
+		DrawDebugSphere(World, Mid, OverlapRadius, 12, FColor::Cyan, false, DebugDrawTime, 0, 0.5f);
 	}
 
 	// 히트 처리
-	if (bHit)
+	for (AActor* HitActor : OverlappedActors)
 	{
-		CombatComp->OnWeaponHit(HitResult);
+		if (CombatComp->OnWeaponHit(HitActor))
+		{
+			if (bDrawDebug)
+			{
+				DrawDebugSphere(World, HitActor->GetActorLocation(), Radius * 1.5f, 12, FColor::Yellow, false, DebugDrawTime, 0, 2.0f);
+			}
 
-		UE_LOG(LogTemp, Log, TEXT("[ANS_WeaponTrace] Hit: %s at %s"),
-			*HitResult.GetActor()->GetName(),
-			*HitResult.ImpactPoint.ToString());
+			UE_LOG(LogTemp, Log, TEXT("[ANS_WeaponTrace] Hit: %s"), *HitActor->GetName());
+		}
 	}
 }
 

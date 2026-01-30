@@ -9,6 +9,7 @@
 #include "Gameplay/Characters/FFCharacter.h"
 #include "Gameplay/Characters/Player_Base.h"
 #include "Gameplay/Data/WeaponData.h"
+#include "Presentations/HUD/PlayerHUD.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/SceneComponent.h"
 #include "Perception/AISense_Hearing.h"
@@ -33,6 +34,99 @@ void UGunAttackSystem::BeginPlay()
 	{
 		UE_LOG(LogTemp, Error, TEXT("GunAttackSystem::BeginPlay - OwnerWeapon is NULL! Component must be attached to AMasterWeapon."));
 		return;
+	}
+}
+
+void UGunAttackSystem::OnAttackStarted()
+{
+	if (!CharacterRef || !CharacterRef->bIsAiming)
+		return;
+
+	bFiring = true;
+	HandleFiring();
+}
+
+void UGunAttackSystem::OnAttackReleased()
+{
+	bFiring = false;
+}
+
+void UGunAttackSystem::HandleFiring()
+{
+	if (!bFiring || !bCanFire)
+		return;
+
+	if (!CharacterRef || !CharacterRef->CanAttack())
+		return;
+
+	ReadyToFire();
+}
+
+void UGunAttackSystem::ReadyToFire()
+{
+	if (!OwnerWeapon || !OwnerWeapon->WeaponData)
+		return;
+
+	bCanFire = false;
+	PerformAttack();
+	UpdateAmmoUI();
+
+	float FireDelay = OwnerWeapon->WeaponData->FireRate;
+	EFireMode CurrentFireMode = OwnerWeapon->WeaponData->FireMode;
+
+	// 이전 타이머 정리
+	if (GetWorld()->GetTimerManager().IsTimerActive(FireRateTimerHandle))
+	{
+		GetWorld()->GetTimerManager().ClearTimer(FireRateTimerHandle);
+	}
+
+	switch (CurrentFireMode)
+	{
+	case EFireMode::FullAuto:
+		GetWorld()->GetTimerManager().SetTimer(
+			FireRateTimerHandle,
+			[this]()
+			{
+				bCanFire = true;
+				HandleFiring();
+			},
+			FireDelay,
+			false
+		);
+		break;
+	default:
+		GetWorld()->GetTimerManager().SetTimer(
+			FireRateTimerHandle,
+			[this]()
+			{
+				bCanFire = true;
+			},
+			FireDelay,
+			false
+		);
+		break;
+	}
+}
+
+void UGunAttackSystem::UpdateAmmoUI()
+{
+	if (!CharacterRef || !OwnerWeapon)
+		return;
+
+	APlayer_Base* Player = Cast<APlayer_Base>(CharacterRef);
+	if (!Player || !Player->IsPlayerControlled())
+		return;
+
+	APlayerController* PC = Cast<APlayerController>(Player->GetController());
+	if (!PC)
+		return;
+
+	APlayerHUD* HUD = Cast<APlayerHUD>(PC->GetHUD());
+	if (HUD)
+	{
+		HUD->UpdateWeaponAmmo(
+			OwnerWeapon->GetMaxAmmo(),
+			OwnerWeapon->GetCurrentAmmo());
 	}
 }
 

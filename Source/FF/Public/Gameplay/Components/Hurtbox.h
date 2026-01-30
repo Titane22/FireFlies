@@ -7,6 +7,15 @@
 #include "PhysicsEngine/PhysicalAnimationComponent.h"
 #include "Hurtbox.generated.h"
 
+UENUM(BlueprintType)
+enum class EMeleeDirection : uint8
+{
+	Left	UMETA(DisplayName = "Left"),
+	Right	UMETA(DisplayName = "Right"),
+	Both	UMETA(DisplayName = "Both"),
+	Top		UMETA(DisplayName = "Top")
+};
+
 class AFFCharacter;
 class UPhysicalAnimationComponent;
 class USkeletalMeshComponent;
@@ -29,6 +38,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Hurtbox")
 	void TriggerHitReaction(const FVector& HitLocation, const FVector& HitDirection, FName BoneName, float ImpulseStrength = 500.f);
 
+	UFUNCTION(BlueprintCallable, Category = "HitReaction")
+	void MeleeHitReaction(const FVector& HitLocation, const FVector& HitDirection);
 protected:
 	virtual void BeginPlay() override;
 
@@ -57,4 +68,9 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Hurtbox|Config")
 	float TriggerDelay = 0.2f;
+
+	UPROPERTY(EditAnywhere, Category = "Hurtbox|HitReaction")
+	TMap<EMeleeDirection, UAnimMontage*> HitReactionMontages;
+
+	EMeleeDirection GetHitDirection(const FVector& HitDirection) const;
 };

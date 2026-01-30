@@ -8,7 +8,7 @@ public class FF : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "Niagara", "UMG", "GameplayCameras", "AIModule", "GameplayTags" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "Niagara", "UMG", "GameplayCameras", "AIModule", "GameplayTags", "MotionWarping" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "EnhancedInput" });
 

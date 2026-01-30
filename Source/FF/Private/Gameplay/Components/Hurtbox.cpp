@@ -123,6 +123,49 @@ void UHurtbox::TriggerHitReaction(const FVector& HitLocation, const FVector& Hit
 	PATrigger();
 }
 
+void UHurtbox::MeleeHitReaction(const FVector& HitLocation, const FVector& HitDirection)
+{
+	if (!CharacterRef)
+		return;
+
+	EMeleeDirection Dir = GetHitDirection(HitDirection);
+
+	UAnimMontage** FoundMontage = HitReactionMontages.Find(Dir);
+	if (!FoundMontage || !*FoundMontage)
+		return;
+
+	if (UAnimInstance* Anim = CharacterRef->GetMesh()->GetAnimInstance())
+	{
+		Anim->Montage_Play(*FoundMontage);
+	}
+}
+
+EMeleeDirection UHurtbox::GetHitDirection(const FVector& HitDirection) const
+{
+	if (!CharacterRef)
+		return EMeleeDirection::Both;
+
+	FVector Forward = CharacterRef->GetActorForwardVector();
+	FVector Right = CharacterRef->GetActorRightVector();
+	FVector HitDir2D = FVector(HitDirection.X, HitDirection.Y, 0.f).GetSafeNormal();
+
+	float DotForward = FVector::DotProduct(Forward, HitDir2D);
+	float DotRight = FVector::DotProduct(Right, HitDir2D);
+
+	// 위에서 내려치는 공격 (Z 성분이 큰 경우)
+	if (HitDirection.Z < -0.5f)
+		return EMeleeDirection::Top;
+
+	// 좌/우가 전/후보다 강하면 좌우 판별
+	if (FMath::Abs(DotRight) > FMath::Abs(DotForward))
+	{
+		return DotRight > 0.f ? EMeleeDirection::Right : EMeleeDirection::Left;
+	}
+
+	// 전/후방 → Both
+	return EMeleeDirection::Both;
+}
+
 //==============================================================================
 // 데미지 배율
 //==============================================================================

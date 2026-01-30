@@ -38,6 +38,19 @@ void UWeaponAttackSystem::TickComponent(float DeltaTime, ELevelTick TickType, FA
 }
 
 
+void UWeaponAttackSystem::OnAttackStarted()
+{
+	PerformAttack();
+}
+
+void UWeaponAttackSystem::OnAttackHeld()
+{
+}
+
+void UWeaponAttackSystem::OnAttackReleased()
+{
+}
+
 bool UWeaponAttackSystem::ApplyHit(const FHitResult HitResult, float DamageAmount, bool& ValidHit)
 {
 	AActor* HitActor = HitResult.GetActor();

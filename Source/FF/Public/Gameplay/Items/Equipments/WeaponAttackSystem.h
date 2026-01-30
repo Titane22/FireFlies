@@ -33,6 +33,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	virtual void PerformAttack() PURE_VIRTUAL(UWeaponAttackSystem::PerformAttack);
 
+	// 입력 라우팅 가상 메서드
+	UFUNCTION(BlueprintCallable, Category = "Combat|Input")
+	virtual void OnAttackStarted();
+
+	UFUNCTION(BlueprintCallable, Category = "Combat|Input")
+	virtual void OnAttackHeld();
+
+	UFUNCTION(BlueprintCallable, Category = "Combat|Input")
+	virtual void OnAttackReleased();
+
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	virtual bool CanReload() const { return false; }
 

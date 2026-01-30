@@ -181,11 +181,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
 	bool bCanSwitchWeapon = true;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Combat")
-	bool bFiring;
-
-	bool bCanAttack = true;
-
 	bool IsCrouch;
 
 	bool IsSprint;

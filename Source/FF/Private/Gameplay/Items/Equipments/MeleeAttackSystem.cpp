@@ -8,10 +8,12 @@
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "MotionWarpingComponent.h"
 
 UMeleeAttackSystem::UMeleeAttackSystem()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
 void UMeleeAttackSystem::BeginPlay()
@@ -32,38 +34,34 @@ void UMeleeAttackSystem::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 	if (CharacterRef)
 	{
 		CalculateTargetYaw();
-
-		float NewRotationZ = FMath::RInterpTo(
-			FRotator(0.f,0.f,CharacterRef->GetActorRotation().Yaw),
-			FRotator(0.f, 0.f, TargetYaw),
+		float NewYaw = FMath::RInterpTo(
+			FRotator(0.f, CharacterRef->GetActorRotation().Yaw, 0.f),
+			FRotator(0.f, TargetYaw, 0.f),
 			GetWorld()->GetDeltaSeconds(),
 			8.f).Yaw;
-		
+
 		CharacterRef->SetActorRotation(
-			FRotator(
-				0.f,
-				0.f,
-				NewRotationZ));
+			FRotator(0.f, NewYaw, 0.f));
 	}
 }
 
 void UMeleeAttackSystem::PerformAttack()
 {
-	GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, TEXT("Called"));
 	if (!CharacterRef)
 		return;
-	GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Green, TEXT("Called"));
 
 	if (bCanCombo)
 	{
 		bAttackQueued = true;
 		return;
 	}
-	GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, TEXT("Called"));
+
+	// 콤보가 진행 중인데 콤보 윈도우가 안 열렸으면 입력 무시
+	if (CurrentAttackIndex >= 0)
+		return;
 
 	if (!CanAttack())
 		return;
-	GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Blue, TEXT("Called"));
 
 	GetNextAttack();
 	PlayCurrentAttack();
@@ -73,6 +71,22 @@ void UMeleeAttackSystem::PlayCurrentAttack()
 {
 	if (!CharacterRef)
 		return;
+
+	if (TargetActor)
+	{
+		if (UMotionWarpingComponent* MWC = CharacterRef->FindComponentByClass<UMotionWarpingComponent>())
+		{
+			FVector ToTarget = TargetActor->GetActorLocation() - CharacterRef->GetActorLocation();
+			FVector Direction = ToTarget.GetSafeNormal();
+			FVector WarpLocation = TargetActor->GetActorLocation() - Direction * WarpTargetOffset;
+
+			FMotionWarpingTarget WarpTarget;
+			WarpTarget.Name = FName("AttackTarget");
+			WarpTarget.Location = WarpLocation;
+			WarpTarget.Rotation = Direction.Rotation();
+			MWC->AddOrUpdateWarpTarget(WarpTarget);
+		}
+	}
 
 	if (USkeletalMeshComponent* CharMesh = CharacterRef->GetMesh())
 	{
@@ -87,9 +101,12 @@ void UMeleeAttackSystem::ExecuteQueuedAttack()
 {
 	bAttackQueued = false;
 	bCanCombo = false;
+	bIsExecutingQueued = true;
 
 	GetNextAttack();
 	PlayCurrentAttack();
+
+	bIsExecutingQueued = false;
 }
 
 void UMeleeAttackSystem::SetComboState(EMeleeAttackType State, bool bEnable)
@@ -98,7 +115,7 @@ void UMeleeAttackSystem::SetComboState(EMeleeAttackType State, bool bEnable)
 	{
 	case EMeleeAttackType::CanStartNextAttack:
 		bCanCombo = bEnable;
-		if (!bEnable)
+		if (!bEnable && !bIsExecutingQueued)
 		{
 			if (bAttackQueued)
 			{
@@ -137,6 +154,24 @@ void UMeleeAttackSystem::ResetCombo()
 	TargetActor = nullptr;
 }
 
+bool UMeleeAttackSystem::TryInterruptAttack()
+{
+	if (!bCanBeInterrupted)
+		return false;
+
+	if (CharacterRef)
+	{
+		if (UAnimInstance* Anim = CharacterRef->GetMesh()->GetAnimInstance())
+		{
+			Anim->Montage_Stop(0.25f);
+		}
+	}
+
+	StopWeaponSweep();
+	ResetCombo();
+	return true;
+}
+
 void UMeleeAttackSystem::StartWeaponSweep()
 {
 	if (!CharacterRef || !OwnerWeapon)
@@ -144,7 +179,7 @@ void UMeleeAttackSystem::StartWeaponSweep()
 	bWeaponSweepActive = true;
 	TargetActors.Empty();
 	SetComponentTickEnabled(false);
-	
+	 
 	if (OwnerWeapon->WeaponData)
 	{
 		WeaponSweepStartSocket = OwnerWeapon->WeaponData->SweepStartSocket;
@@ -226,6 +261,7 @@ void UMeleeAttackSystem::CheckTarget()
 	}
 	if (TargetActor)
 	{
+		GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, TEXT("SetComponentTickEnabled(true)"));
 		SetComponentTickEnabled(true);
 	}
 }
@@ -272,7 +308,6 @@ void UMeleeAttackSystem::CauseDamage()
 		IgnoreActors,
 		OverlappedActors
 	);
-
 	bool bValidHit;
 	for (AActor* CurrentActor : OverlappedActors)
 	{
@@ -283,6 +318,7 @@ void UMeleeAttackSystem::CauseDamage()
 
 		bool bIsDead = ApplyHit(HitResult, BaseDamage, bValidHit);
 	}
+	
 	if (bValidHit)
 	{
 		float CapHeight, CapWidth;
@@ -323,17 +359,31 @@ bool UMeleeAttackSystem::GetWeaponTracePoints(FVector& OutStart, FVector& OutEnd
 	return true;
 }
 
-void UMeleeAttackSystem::OnWeaponHit(FHitResult& HitResult)
+bool UMeleeAttackSystem::OnWeaponHit(AActor* HitActor)
 {
-	if (!OwnerWeapon || !OwnerWeapon->WeaponData)
-		return;
-	AActor* HitActor = HitResult.GetActor();
-	if (!HitActor)
-		return;
+	if (!HitActor || !OwnerWeapon || !OwnerWeapon->WeaponData || !CharacterRef)
+		return false;
+	// 이미 이번 스윙에서 히트한 액터는 무시
+	if (TargetActors.Contains(HitActor))
+		return false;
 
-	if (HitActor->Implements<UDamageable>())
-	{
-		bool bValidHit;
-		bool bIsDead = ApplyHit(HitResult, OwnerWeapon->WeaponData->Damage, bValidHit);
-	}
+	if (!HitActor->Implements<UDamageable>())
+		return false;
+
+	TargetActors.Add(HitActor);
+	
+	// 공격 방향: 공격자 → 피격자
+	FVector Direction = (HitActor->GetActorLocation() - CharacterRef->GetActorLocation()).GetSafeNormal();
+
+	FHitResult HitResult;
+	HitResult.ImpactPoint = HitActor->GetActorLocation();
+	HitResult.Location = HitActor->GetActorLocation();
+	HitResult.ImpactNormal = -Direction;
+	HitResult.HitObjectHandle = FActorInstanceHandle(HitActor);
+
+	float BaseDamage = CurrentAttack.DamageMultiplier * OwnerWeapon->WeaponData->Damage;
+	bool bValidHit;
+	ApplyHit(HitResult, BaseDamage, bValidHit);
+
+	return true;
 }

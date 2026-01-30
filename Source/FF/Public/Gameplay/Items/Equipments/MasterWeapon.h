@@ -27,6 +27,10 @@ public:
 
 	virtual void Attack();
 	virtual void Reload();
+
+	void OnAttackStarted();
+	void OnAttackHeld();
+	void OnAttackReleased();
 	
 protected:
 	// Called when the game starts or when spawned

@@ -73,12 +73,11 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	void UpdateWeaponUI(UWeaponData* WeaponData);
 
-	void ShootFire(const FInputActionValue& Value);
+	void OnAttackStarted(const FInputActionValue& Value);
+	void OnAttackHeld(const FInputActionValue& Value);
+	void OnAttackReleased(const FInputActionValue& Value);
 
 	void Reload();
-
-	void HandleFiring();
-	void ReadyToFire(AMasterWeapon* MasterWeapon, UWeaponData* CurrentWeaponDataAsset);
 
 	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 

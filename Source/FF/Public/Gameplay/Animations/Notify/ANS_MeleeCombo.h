@@ -25,9 +25,9 @@ public:
 	virtual void NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
 
 protected:
-	/** Trace channel to use for weapon sweep */
+	/** Object types to detect for weapon sweep overlap */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Trace")
-	TEnumAsByte<ECollisionChannel> TraceChannel = ECC_Pawn;
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
 
 	/** Draw debug visualization */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Trace|Debug")

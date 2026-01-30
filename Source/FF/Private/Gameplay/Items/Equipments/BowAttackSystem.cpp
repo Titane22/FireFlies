@@ -30,6 +30,19 @@ void UBowAttackSystem::BeginPlay()
 	}
 }
 
+void UBowAttackSystem::OnAttackStarted()
+{
+	if (!CharacterRef || !CharacterRef->bIsAiming)
+		return;
+
+	StartCharge();
+}
+
+void UBowAttackSystem::OnAttackReleased()
+{
+	ReleaseCharge();
+}
+
 void UBowAttackSystem::PerformAttack()
 {
 	// 기존 즉발 발사: 차지 없이 기본 파워로 발사

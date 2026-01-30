@@ -206,6 +206,30 @@ void AMasterWeapon::Attack()
     }
 }
 
+void AMasterWeapon::OnAttackStarted()
+{
+    if (AttackSystem)
+    {
+        AttackSystem->OnAttackStarted();
+    }
+}
+
+void AMasterWeapon::OnAttackHeld()
+{
+    if (AttackSystem)
+    {
+        AttackSystem->OnAttackHeld();
+    }
+}
+
+void AMasterWeapon::OnAttackReleased()
+{
+    if (AttackSystem)
+    {
+        AttackSystem->OnAttackReleased();
+    }
+}
+
 void AMasterWeapon::Reload()
 {
     if (!AttackSystem || !WeaponData)

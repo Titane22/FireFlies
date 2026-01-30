@@ -28,7 +28,6 @@ enum class EFireMode : uint8
 	Burst       UMETA(DisplayName = "Burst")
 };
 
-
 USTRUCT(BlueprintType)
 struct FComboAttack
 {
