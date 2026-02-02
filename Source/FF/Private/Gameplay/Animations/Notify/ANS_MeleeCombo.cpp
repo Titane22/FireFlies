@@ -4,7 +4,6 @@
 #include "Gameplay/Animations/Notify/ANS_MeleeCombo.h"
 
 #include "Gameplay/Characters/FFCharacter.h"
-#include "Gameplay/Items/Equipments/MasterWeapon.h"
 #include "Gameplay/Items/Equipments/MeleeAttackSystem.h"
 #include "Kismet/KismetSystemLibrary.h"
 
@@ -26,15 +25,10 @@ void UANS_WeaponTrace::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequen
 	if (!Character)
 		return;
 
-	AMasterWeapon* CurrentWeapon = Character->GetCurrentWeapon();
-	if (!CurrentWeapon)
-		return;
-	
-	UMeleeAttackSystem* CombatComp = Cast<UMeleeAttackSystem>(CurrentWeapon->AttackSystem);
+	UMeleeAttackSystem* CombatComp = Character->GetMeleeAttackSystem();
 	if (!CombatComp)
 		return;
 
-	
 	// 무기 Sweep 시작
 	CombatComp->StartWeaponSweep();
 
@@ -52,11 +46,7 @@ void UANS_WeaponTrace::NotifyTick(USkeletalMeshComponent* MeshComp, UAnimSequenc
 	if (!Character)
 		return;
 
-	AMasterWeapon* CurrentWeapon = Character->GetCurrentWeapon();
-	if (!CurrentWeapon)
-		return;
-	
-	UMeleeAttackSystem* CombatComp = Cast<UMeleeAttackSystem>(CurrentWeapon->AttackSystem);
+	UMeleeAttackSystem* CombatComp = Character->GetMeleeAttackSystem();
 	if (!CombatComp)
 		return;
 
@@ -127,11 +117,7 @@ void UANS_WeaponTrace::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequence
 	if (!Character)
 		return;
 
-	AMasterWeapon* CurrentWeapon = Character->GetCurrentWeapon();
-	if (!CurrentWeapon)
-		return;
-	
-	UMeleeAttackSystem* CombatComp = Cast<UMeleeAttackSystem>(CurrentWeapon->AttackSystem);
+	UMeleeAttackSystem* CombatComp = Character->GetMeleeAttackSystem();
 	if (!CombatComp)
 		return;
 

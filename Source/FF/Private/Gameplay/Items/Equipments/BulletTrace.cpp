@@ -3,10 +3,10 @@
 #include "Gameplay/Items/Equipments/BulletTrace.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/DamageEvents.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "NiagaraComponent.h"
-#include "Gameplay/Characters/FFCharacter.h"
-#include "Gameplay/Components/Hurtbox.h"
+#include "Gameplay/Interfaces/Damageable.h"
 
 ABulletTrace::ABulletTrace()
 {
@@ -102,15 +102,35 @@ void ABulletTrace::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AAct
 
 void ABulletTrace::ProcessHit(AActor* HitActor, const FHitResult& HitResult)
 {
-	AFFCharacter* HitCharacter = Cast<AFFCharacter>(HitActor);
-	if (!HitCharacter)
-	{
+	if (!HitActor || !HitActor->Implements<UDamageable>())
 		return;
+
+	// 물리 오브젝트에 충격 적용
+	UPrimitiveComponent* HitComponent = HitResult.GetComponent();
+	if (HitComponent && HitComponent->IsSimulatingPhysics())
+	{
+		FVector ImpulseDir = GetVelocity().GetSafeNormal();
+		HitComponent->AddImpulseAtLocation(ImpulseDir * ImpactForce, HitResult.ImpactPoint);
 	}
 
-	// Hit Reaction 적용
+	// 데미지 적용
+	FVector ShotDirection = GetVelocity().GetSafeNormal();
+	FPointDamageEvent DamageEvent(
+		BaseDamage,
+		HitResult,
+		ShotDirection,
+		nullptr
+	);
 
-	// TODO: 데미지 적용
-	// float DamageMultiplier = Hurtbox ? Hurtbox->GetDamageMultiplier(HitResult.BoneName) : 1.f;
-	// float FinalDamage = BaseDamage * DamageMultiplier;
+	APawn* InstigatorPawn = GetInstigator();
+	AController* InstigatorCtrl = InstigatorPawn ? InstigatorPawn->GetController() : nullptr;
+
+	IDamageable::Execute_TakeDamage(
+		HitActor,
+		BaseDamage,
+		DamageEvent,
+		HitResult.BoneName,
+		InstigatorCtrl,
+		GetOwner()
+	);
 }

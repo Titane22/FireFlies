@@ -67,6 +67,12 @@ void UMeleeAttackSystem::PerformAttack()
 	PlayCurrentAttack();
 }
 
+void UMeleeAttackSystem::PerformComboAttack(int32 NumAttacks)
+{
+	RemainingAutoAttacks = FMath::Max(0, NumAttacks - 1);
+	PerformAttack();
+}
+
 void UMeleeAttackSystem::PlayCurrentAttack()
 {
 	if (!CharacterRef)
@@ -115,6 +121,11 @@ void UMeleeAttackSystem::SetComboState(EMeleeAttackType State, bool bEnable)
 	{
 	case EMeleeAttackType::CanStartNextAttack:
 		bCanCombo = bEnable;
+		if (bEnable && RemainingAutoAttacks > 0)
+		{
+			bAttackQueued = true;
+			--RemainingAutoAttacks;
+		}
 		if (!bEnable && !bIsExecutingQueued)
 		{
 			if (bAttackQueued)
@@ -150,8 +161,10 @@ void UMeleeAttackSystem::ResetCombo()
 	bCanCombo = false;
 	bAttackQueued = false;
 	bCanBeInterrupted = false;
+	RemainingAutoAttacks = 0;
 	SetComponentTickEnabled(false);
 	TargetActor = nullptr;
+	OnComboEnded.Broadcast();
 }
 
 bool UMeleeAttackSystem::TryInterruptAttack()

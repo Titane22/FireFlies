@@ -9,6 +9,8 @@
 
 class AFFCharacter;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnComboEnded);
+
 UENUM(BlueprintType)
 enum class EMeleeAttackType : uint8
 {
@@ -34,15 +36,22 @@ public:
 
 	virtual void PerformAttack() override;
 
-	void StartWeaponSweep();
-	
+	/** 자동 콤보: NumAttacks회 연속 공격. 콤보 윈도우마다 자동 큐잉. */
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	void PerformComboAttack(int32 NumAttacks);
+
+	UPROPERTY(BlueprintAssignable, Category = "Combat")
+	FOnComboEnded OnComboEnded;
+
+	virtual void StartWeaponSweep();
+
 	void StopWeaponSweep();
 
 	float GetWeaponSweepRadius();
-	
-	bool GetWeaponTracePoints(FVector& OutStart, FVector& OutEnd) const;
 
-	bool OnWeaponHit(AActor* HitActor);
+	virtual bool GetWeaponTracePoints(FVector& OutStart, FVector& OutEnd) const;
+
+	virtual bool OnWeaponHit(AActor* HitActor);
 
 	void SetComboState(EMeleeAttackType State, bool bEnable);
 	void ResetCombo();
@@ -88,6 +97,12 @@ protected:
 
 	bool bWeaponSweepActive = false;
 	bool bIsExecutingQueued = false;
+	int32 RemainingAutoAttacks = 0;
+
+	virtual void InitializeComboAttacks();
+
+	virtual void CauseDamage();
+
 private:
 	bool CanAttack();
 
@@ -96,10 +111,6 @@ private:
 	void CheckTarget();
 
 	void CalculateTargetYaw();
-
-	void InitializeComboAttacks();
-
-	void CauseDamage();
 
 	void PlayCurrentAttack();
 

@@ -15,6 +15,7 @@ class UHealthSystem;
 class UInventorySystem;
 class UEquipmentSystem;
 class UPhysicalAnimationComponent;
+class UMeleeAttackSystem;
 class AMasterWeapon;
 struct FInputActionValue;
 
@@ -100,6 +101,9 @@ public:
 	bool CanAttack();
 
 	AMasterWeapon* GetCurrentWeapon() const { return CurrentWeapon; }
+
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	UMeleeAttackSystem* GetMeleeAttackSystem() const;
 protected:
 	virtual void BeginPlay();
 

@@ -4,7 +4,6 @@
 #include "Gameplay/Animations/Notify/ANS_ComboState.h"
 
 #include "Gameplay/Characters/FFCharacter.h"
-#include "Gameplay/Items/Equipments/MasterWeapon.h"
 #include "Gameplay/Items/Equipments/MeleeAttackSystem.h"
 
 void UANS_ComboState::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float TotalDuration, const FAnimNotifyEventReference& EventReference)
@@ -18,11 +17,7 @@ void UANS_ComboState::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenc
 	if (!Character)
 		return;
 
-	AMasterWeapon* CurrentWeapon = Character->GetCurrentWeapon();
-	if (!CurrentWeapon)
-		return;
-
-	UMeleeAttackSystem* CombatComp = Cast<UMeleeAttackSystem>(CurrentWeapon->AttackSystem);
+	UMeleeAttackSystem* CombatComp = Character->GetMeleeAttackSystem();
 	if (!CombatComp)
 		return;
 
@@ -40,11 +35,7 @@ void UANS_ComboState::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceB
 	if (!Character)
 		return;
 
-	AMasterWeapon* CurrentWeapon = Character->GetCurrentWeapon();
-	if (!CurrentWeapon)
-		return;
-
-	UMeleeAttackSystem* CombatComp = Cast<UMeleeAttackSystem>(CurrentWeapon->AttackSystem);
+	UMeleeAttackSystem* CombatComp = Character->GetMeleeAttackSystem();
 	if (!CombatComp)
 		return;
 

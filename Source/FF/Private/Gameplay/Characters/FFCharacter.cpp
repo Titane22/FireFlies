@@ -12,6 +12,7 @@
 #include "Gameplay/Items/InventorySystem.h"
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
 #include "Gameplay/Items/Equipments/MasterMagazine.h"
+#include "Gameplay/Items/Equipments/MeleeAttackSystem.h"
 #include "Gameplay/Items/Equipments/WeaponAttackSystem.h"
 #include "Gameplay/Items/Interaction/Interactor.h"
 #include "Gameplay/Data/MagazineData.h"
@@ -259,6 +260,19 @@ bool AFFCharacter::DoesWeaponNeedReload(AMasterWeapon* Weapon) const
 		return true;
 
 	return !Weapon->CurrentMagazine->HasAmmo();
+}
+
+UMeleeAttackSystem* AFFCharacter::GetMeleeAttackSystem() const
+{
+	if (CurrentWeapon && CurrentWeapon->AttackSystem)
+	{
+		if (UMeleeAttackSystem* MeleeSystem = Cast<UMeleeAttackSystem>(CurrentWeapon->AttackSystem))
+		{
+			return MeleeSystem;
+		}
+	}
+
+	return FindComponentByClass<UMeleeAttackSystem>();
 }
 
 bool AFFCharacter::CanAttack()

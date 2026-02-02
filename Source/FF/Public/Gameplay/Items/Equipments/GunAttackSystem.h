@@ -6,8 +6,6 @@
 #include "WeaponAttackSystem.h"
 #include "GunAttackSystem.generated.h"
 
-#define COLLISION_BULLET ECollisionChannel::ECC_GameTraceChannel1
-
 class AFFCharacter;
 class USkeletalMesh;
 class AMasterWeapon;

@@ -2,6 +2,7 @@
 
 
 #include "Gameplay/Items/Equipments/GunAttackSystem.h"
+#include "Gameplay/Items/Equipments/BulletTrace.h"
 #include "Gameplay/Items/Equipments/MasterWeapon.h"
 #include "Gameplay/Items/Equipments/MasterMagazine.h"
 #include "Gameplay/Items/InventorySystem.h"
@@ -237,141 +238,41 @@ void UGunAttackSystem::SetCurrentAmmo(float Amount)
 
 void UGunAttackSystem::FireBullet(FHitResult Hit, bool bReturnHit)
 {
+    if (!CharacterRef || !OwnerWeapon->WeaponData)
+        return;
+
     for (int32 curBurst = 0; curBurst < OwnerWeapon->WeaponData->BurstAmount; curBurst++)
     {
         float PointX, PointY;
         RandPointInCircle(FMath::Tan(OwnerWeapon->WeaponData->BulletSpread) * 10.0f, PointX, PointY);
 
-        // Get the player camera manager for the bullet direction
         APlayerCameraManager* CameraManager = GetWorld()->GetFirstPlayerController()->PlayerCameraManager;
         if (!CameraManager)
-        {
             return;
-        }
+
         FVector SpreadAdjustedHitLocation = Hit.Location + CameraManager->GetActorRightVector() * PointX + CameraManager->GetActorUpVector() * PointY;
         FVector MuzzleLocation = OwnerWeapon->EquipmentMesh->GetSocketLocation(FName("Muzzle"));
+        FVector BulletDirection = (SpreadAdjustedHitLocation - MuzzleLocation).GetSafeNormal();
 
-        // BulletDirection represents the direction from the muzzle to the target.
-        // Calculate the direction vector of the trajectory 
-        // by subtracting the aim point position from the muzzle position.
-        FVector BulletDirection = MuzzleLocation - SpreadAdjustedHitLocation;
-        
-        // Setup trace parameters
-        FCollisionQueryParams QueryParams;
-        QueryParams.AddIgnoredActor(GetOwner());
-        
-        // Create array of actors to ignore
-        
-        if (!CharacterRef)
+        // BulletTrace 스폰 - 충돌 시 데미지는 BulletTrace::ProcessHit에서 처리
+        if (OwnerWeapon->WeaponData->BulletTraceClass)
         {
-            GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Yellow, TEXT("WeaponSystem->CharacterRef is NULL"));
-            return;
-        }
-        QueryParams.AddIgnoredActor(Cast<AActor>(CharacterRef));
+            FTransform SpawnTransform;
+            SpawnTransform.SetLocation(MuzzleLocation);
+            SpawnTransform.SetRotation(BulletDirection.Rotation().Quaternion());
 
-        // ===== 디버그 라인 활성화 =====
-        // DrawDebugLine(
-        //     GetWorld(),           // 월드
-        //     MuzzleLocation,        // 시작점
-        //     MuzzleLocation + (BulletDirection * -5.0f),          // 끝점
-        //     FColor::Yellow,       // 라인 색상
-        //     false,               // 지속적으로 그릴지 여부
-        //     5.0f,                // 지속 시간 (초)
-        //     0,                   // 우선순위
-        //     2.0f                 // 두께
-        // );
-        // ==============================
-        // Perform line trace
-        FHitResult HitResult;
-        bool bHit = GetWorld()->LineTraceSingleByChannel(
-            HitResult,
-            MuzzleLocation,
-            MuzzleLocation + (BulletDirection * -5.0f),
-            COLLISION_BULLET,
-            QueryParams
-        );
-        if (!bHit)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Yellow, TEXT("Anyone not Hit!!!!!!"));
-            return;
-        }
+            FActorSpawnParameters SpawnParams;
+            SpawnParams.Owner = OwnerWeapon;
+            SpawnParams.Instigator = CharacterRef;
 
-        // Process hit result
-        if (HitResult.GetActor())
-        {
-            // Check if hit component is simulating physics
-            UPrimitiveComponent* HitComponent = HitResult.GetComponent();
-            if (HitComponent && HitComponent->IsSimulatingPhysics())
+            ABulletTrace* SpawnedBullet = GetWorld()->SpawnActor<ABulletTrace>(
+                OwnerWeapon->WeaponData->BulletTraceClass, SpawnTransform, SpawnParams);
+            if (SpawnedBullet)
             {
-                // Apply physics impulse at impact point
-                FVector ImpulseDir = -BulletDirection.GetSafeNormal();
-                HitComponent->AddImpulseAtLocation(ImpulseDir * -1000.0f, HitResult.Location);
-            }
-
-            // Apply damage to hit actor
-            bool bValidHit;
-            bool bKilledPlayer = ApplyHit(HitResult, OwnerWeapon->WeaponData->Damage, bValidHit);
-            
-            if (bValidHit)
-            {
-                // HitMarker
-                //if (OwnerWeapon->WeaponData && OwnerWeapon->WeaponData->HitMarkerUI)
-                {
-                    // TODO: Hit Marker
-                    // UUserWidget* UIHitMarker = CreateWidget<UUserWidget>(GetWorld()->GetFirstPlayerController(), WeaponData->HitMarkerUI);
-                    // if (UIHitMarker)
-                    // {
-                    //     UIHitMarker->AddToViewport();
-                    // }
-                }
-            }
-            if (bKilledPlayer)
-            {
-                // PlaySound2D
-                if (OwnerWeapon->WeaponData && OwnerWeapon->WeaponData->KillSound)
-                {
-                    UGameplayStatics::PlaySound2D(
-                        this,
-                        OwnerWeapon->WeaponData->KillSound,
-                        1.0f,
-                        1.0f,
-                        0.0f,
-                        nullptr,
-                        nullptr,
-                        true
-                    );
-                }
-                else
-                {
-                    UE_LOG(LogTemp, Warning, TEXT("MasterWeapon::FireBullet::KillSound is NULL"));
-                }
-            }
-
-            // Spawn bullet trace effect
-            if (OwnerWeapon->WeaponData && OwnerWeapon->WeaponData->BulletTraceClass)
-            {
-                FVector BulletEndLocation = HitResult.bBlockingHit ? HitResult.ImpactPoint : HitResult.TraceEnd;
-                BulletEndLocation = BulletEndLocation - MuzzleLocation;
-
-                FTransform SpawnTransform;
-                SpawnTransform.SetLocation(OwnerWeapon->EquipmentMesh->GetSocketLocation(FName("Muzzle")));
-                SpawnTransform.SetRotation(BulletEndLocation.Rotation().Quaternion());
-                SpawnTransform.SetScale3D(FVector(1.0f, 1.0f, 1.0f));
-
-                FActorSpawnParameters SpawnParams;
-                SpawnParams.Owner = OwnerWeapon;
-                SpawnParams.Instigator = OwnerWeapon->GetInstigator();
-
-                AActor* SpawnedTrace = GetWorld()->SpawnActor<AActor>(OwnerWeapon->WeaponData->BulletTraceClass, SpawnTransform, SpawnParams);
-                if (SpawnedTrace)
-                {
-                    SpawnedTrace->SetLifeSpan(BulletTraceLifeSpan);
-                }
+                SpawnedBullet->SetLifeSpan(BulletTraceLifeSpan);
+                SpawnedBullet->BaseDamage = OwnerWeapon->WeaponData->Damage;
             }
         }
-
-        Hit = HitResult;
-        bReturnHit = true;
     }
 }
 
@@ -487,12 +388,14 @@ void UGunAttackSystem::FireBlankTracer()
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = OwnerWeapon;
-	SpawnParams.Instigator = OwnerWeapon->GetInstigator();
+	SpawnParams.Instigator = CharacterRef;
 
-	AActor* SpawnedTrace = GetWorld()->SpawnActor<AActor>(OwnerWeapon->WeaponData->BulletTraceClass, NewTransform, SpawnParams);
-	if (SpawnedTrace)
+	ABulletTrace* SpawnedBullet = GetWorld()->SpawnActor<ABulletTrace>(
+		OwnerWeapon->WeaponData->BulletTraceClass, NewTransform, SpawnParams);
+	if (SpawnedBullet)
 	{
-		SpawnedTrace->SetLifeSpan(BulletTraceLifeSpan);
+		SpawnedBullet->SetLifeSpan(BulletTraceLifeSpan);
+		SpawnedBullet->BaseDamage = OwnerWeapon->WeaponData->Damage;
 	}
 }
 
@@ -681,32 +584,6 @@ void UGunAttackSystem::ApplyCameraShake(APlayerController* PC)
 
 void UGunAttackSystem::ExecuteFireSequence(const FHitResult& CameraHitResult)
 {
-    FVector MuzzleLocation = OwnerWeapon->EquipmentMesh->GetSocketLocation(FName("Muzzle"));
-    FVector DirectionToTarget = MuzzleLocation - CameraHitResult.Location;
-    
-    // Perform muzzle trace
-    FCollisionQueryParams QueryParams;
-    QueryParams.AddIgnoredActor(OwnerWeapon);
-    
-    // DrawDebugLine(
-    //     GetWorld(),           // 월드
-    //     MuzzleLocation,        // 시작점
-    //     MuzzleLocation + (DirectionToTarget * -500.0f),          // 끝점
-    //     FColor::Yellow,       // 라인 색상
-    //     false,               // 지속적으로 그릴지 여부
-    //     5.0f,                // 지속 시간 (초)
-    //     0,                   // 우선순위
-    //     2.0f                 // 두께
-    // );
-    FHitResult MuzzleHitResult;
-    bool bMuzzleHit = GetWorld()->LineTraceSingleByChannel(
-        MuzzleHitResult,
-        MuzzleLocation,
-        MuzzleLocation + (DirectionToTarget * -500.0f),
-        ECollisionChannel::ECC_Visibility,
-        QueryParams
-    );
-
     PlayFireEffect();
     FireBullet(CameraHitResult, false);
 }
