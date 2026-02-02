@@ -16,6 +16,7 @@
 #include "Gameplay/Items/Interaction/Interactor.h"
 #include "Gameplay/Data/MagazineData.h"
 #include "Gameplay/Data/WeaponData.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "Perception/AISense_Damage.h"
 #include "PhysicsEngine/PhysicalAnimationComponent.h"
 
@@ -81,13 +82,13 @@ float AFFCharacter::TakeDamage_Implementation(float DamageAmount, const FPointDa
 	FVector HitLocation = DamageEvent.HitInfo.ImpactPoint;
 	FVector HitDirection = DamageEvent.ShotDirection;
 
-	Hurtbox->MeleeHitReaction(HitLocation, HitDirection);
 	// TODO: Procedural Hit Reaction & 무기에 따른 브랜치(수류탄 등)
 	//Hurtbox->TriggerHitReaction(HitLocation, HitDirection, HitBoneName, 1000.f);
 	
+	Hurtbox->MeleeHitReaction(HitLocation, HitDirection);
+	
 	//float Multiplier = Hurtbox->GetDamageMultiplier(HitBoneName);
 	float ModifiedDamage = DamageAmount;
-	
 	HealthComponent->ApplyDamage(ModifiedDamage);
 	if (EventInstigator)
 	{

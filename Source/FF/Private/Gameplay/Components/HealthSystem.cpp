@@ -26,7 +26,6 @@ void UHealthSystem::BeginPlay()
 	
 	CharacterRef = Owner;
 	CurrentHealth = MaxHealth;
-
 }
 
 bool UHealthSystem::IsDead() const
@@ -41,7 +40,7 @@ bool UHealthSystem::ApplyDamage(float Damage)
 
 	float OldHealth = CurrentHealth;
 	CurrentHealth = FMath::Clamp(CurrentHealth - Damage, 0.f, MaxHealth);
-
+	
 	float ActualHealth = OldHealth - CurrentHealth;
 	OnHealthChanged.Broadcast(ActualHealth, Damage);
 
