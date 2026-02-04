@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "GameplayTagContainer.h"
+#include "GameplayTagAssetInterface.h"
 #include "Gameplay/Data/ItemData.h"
 #include "Gameplay/Data/InventoryTypes.h"
 #include "Gameplay/Interfaces/Damageable.h"
@@ -55,7 +57,7 @@ enum class ECameraStyle : uint8
 };
 
 UCLASS()
-class FF_API AFFCharacter : public ACharacter, public IDamageable
+class FF_API AFFCharacter : public ACharacter, public IDamageable, public IGameplayTagAssetInterface
 {
 	GENERATED_BODY()
 
@@ -104,6 +106,21 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	UMeleeAttackSystem* GetMeleeAttackSystem() const;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
+	FGameplayTagContainer CharacterStateTags;
+
+	UFUNCTION(BlueprintCallable, Category = "State")
+	void AddStateTag(FGameplayTag Tag);
+
+	UFUNCTION(BlueprintCallable, Category = "State")
+	void RemoveStateTag(FGameplayTag Tag);
+
+	UFUNCTION(BlueprintCallable, Category = "State")
+	bool HasStateTag(FGameplayTag Tag) const;
+
+	// IGameplayTagAssetInterface
+	virtual void GetOwnedGameplayTags(FGameplayTagContainer& TagContainer) const override;
 protected:
 	virtual void BeginPlay();
 

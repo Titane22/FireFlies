@@ -29,6 +29,7 @@ public:
 
 	// 입력 라우팅 오버라이드
 	virtual void OnAttackStarted() override;
+	virtual void OnAttackHeld() override;
 	virtual void OnAttackReleased() override;
 
 	virtual bool CanReload() const override;

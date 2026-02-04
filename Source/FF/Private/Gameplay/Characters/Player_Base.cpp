@@ -210,6 +210,9 @@ void APlayer_Base::UpdateWeaponUI(UWeaponData* WeaponData)
 
 void APlayer_Base::OnAttackStarted(const FInputActionValue& Value)
 {
+	if (!CanAttack())
+		return;
+
 	if (CurrentWeapon)
 	{
 		CurrentWeapon->OnAttackStarted();
@@ -218,6 +221,9 @@ void APlayer_Base::OnAttackStarted(const FInputActionValue& Value)
 
 void APlayer_Base::OnAttackHeld(const FInputActionValue& Value)
 {
+	if (!CanAttack())
+		return;
+
 	if (CurrentWeapon)
 	{
 		CurrentWeapon->OnAttackHeld();
@@ -567,6 +573,15 @@ void APlayer_Base::Interact()
 	Interact_Completed();
 }
 
+void APlayer_Base::CloseInventory(UAnimInstance* AnimInst)
+{
+	AnimInst->Montage_Play(CloseInventoryAnimMontage, 0.75f);
+
+	FOnMontageEnded CompleteDelegate;
+	CompleteDelegate.BindUObject(this, &APlayer_Base::OnCloseMontageEnded);
+	AnimInst->Montage_SetEndDelegate(CompleteDelegate, CloseInventoryAnimMontage);
+}
+
 void APlayer_Base::Inventory()
 {
 	APC_Base* PC = Cast<APC_Base>(GetController());
@@ -576,11 +591,7 @@ void APlayer_Base::Inventory()
 	{
 		if (PC->IsVisibleWidget())
 		{
-			AnimInst->Montage_Play(CloseInventoryAnimMontage, 0.75f);
-
-			FOnMontageEnded CompleteDelegate;
-			CompleteDelegate.BindUObject(this, &APlayer_Base::OnCloseMontageEnded);
-			AnimInst->Montage_SetEndDelegate(CompleteDelegate, CloseInventoryAnimMontage);
+			CloseInventory(AnimInst);
 		}
 		else
 		{

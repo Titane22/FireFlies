@@ -47,14 +47,31 @@ void UGunAttackSystem::OnAttackStarted()
 	HandleFiring();
 }
 
+void UGunAttackSystem::OnAttackHeld()
+{
+	if (!CharacterRef || !CharacterRef->bIsAiming)
+		return;
+
+	bFiring = true;
+
+	// bCanFire가 true이면 발사 시도 (타이머 체인이 끊긴 경우 복구)
+	if (bCanFire)
+	{
+		HandleFiring();
+	}
+}
+
 void UGunAttackSystem::OnAttackReleased()
 {
 	bFiring = false;
+	// FullAuto 타이머 정리 - 타이머 존재 자체가 연사 상태
+	GetWorld()->GetTimerManager().ClearTimer(FireRateTimerHandle);
+	bCanFire = true;
 }
 
 void UGunAttackSystem::HandleFiring()
 {
-	if (!bFiring || !bCanFire)
+	if (!bCanFire)
 		return;
 
 	if (!CharacterRef || !CharacterRef->CanAttack())
@@ -75,21 +92,22 @@ void UGunAttackSystem::ReadyToFire()
 	float FireDelay = OwnerWeapon->WeaponData->FireRate;
 	EFireMode CurrentFireMode = OwnerWeapon->WeaponData->FireMode;
 
-	// 이전 타이머 정리
-	if (GetWorld()->GetTimerManager().IsTimerActive(FireRateTimerHandle))
-	{
-		GetWorld()->GetTimerManager().ClearTimer(FireRateTimerHandle);
-	}
+	GetWorld()->GetTimerManager().ClearTimer(FireRateTimerHandle);
 
 	switch (CurrentFireMode)
 	{
 	case EFireMode::FullAuto:
+		// 타이머 콜백에서 bFiring을 체크하지 않음
+		// OnAttackReleased에서 타이머를 직접 Clear하여 연사 중지
 		GetWorld()->GetTimerManager().SetTimer(
 			FireRateTimerHandle,
 			[this]()
 			{
 				bCanFire = true;
-				HandleFiring();
+				if (CharacterRef && CharacterRef->CanAttack())
+				{
+					ReadyToFire();
+				}
 			},
 			FireDelay,
 			false

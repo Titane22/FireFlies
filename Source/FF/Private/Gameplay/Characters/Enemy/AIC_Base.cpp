@@ -242,7 +242,7 @@ void AAIC_Base::OnPerceptionUpdated(const TArray<AActor*>& UpdateActors)
 			// 성공적으로 시야에 들어옴 - 거리에 따른 반응
 			if (Distance < 300.f)
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("Called"));
+				//GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("Called"));
 				// 가까운 거리 - 즉시 공격
 				HandleSensedSight(Player);
 			}
@@ -305,6 +305,12 @@ void AAIC_Base::OnPerceptionUpdated(const TArray<AActor*>& UpdateActors)
 				// 작은 소리 또는 먼 소리 - 자극 위치로 조사
 				HandleSensedHearing(HearingStimulus.StimulusLocation);
 			}
+		}
+
+		// 피해 감지 체크
+		if (CanSenseActor(Player, ESenseType::Damage, DamageStimulus))
+		{
+			HandleSensedDamage(Player);
 		}
 
 	}

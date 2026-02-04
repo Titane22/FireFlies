@@ -91,15 +91,15 @@ float AFFCharacter::TakeDamage_Implementation(float DamageAmount, const FPointDa
 	//float Multiplier = Hurtbox->GetDamageMultiplier(HitBoneName);
 	float ModifiedDamage = DamageAmount;
 	HealthComponent->ApplyDamage(ModifiedDamage);
-	if (EventInstigator)
+	if (EventInstigator && EventInstigator->GetPawn())
 	{
 		UAISense_Damage::ReportDamageEvent(
 			GetWorld(),
-			this,                              
-			EventInstigator,   
+			this,
+			EventInstigator->GetPawn(),
 			ModifiedDamage,
-			GetActorLocation(),                
-			GetActorLocation()                 
+			GetActorLocation(),
+			GetActorLocation()
 		);
 	}
 	else
@@ -240,7 +240,6 @@ void AFFCharacter::OnInventoryItemAdded(const FItemSlot& AddedItem)
 	// 탄약이 있는 탄창인지 확인
 	if (AddedItem.CurrentAmmo <= 0)
 		return;
-
 	
 	// 자동 리로드 설정 확인
 	if (CurrentWeapon->AttackSystem && CurrentWeapon->AttackSystem->bAutoReload)
@@ -277,5 +276,29 @@ UMeleeAttackSystem* AFFCharacter::GetMeleeAttackSystem() const
 
 bool AFFCharacter::CanAttack()
 {
-	return !IsSprint && !bIsDodging && CanJump() && bCanSwitchWeapon;
+	const FGameplayTag DisabledTag = FGameplayTag::RequestGameplayTag(FName("State.Disabled"));
+	bool bHasDisabledTag = CharacterStateTags.HasTag(DisabledTag);
+
+	return !IsSprint && !bIsDodging && !GetCharacterMovement()->IsFalling()
+		&& bCanSwitchWeapon && !bHasDisabledTag;
+}
+
+void AFFCharacter::AddStateTag(FGameplayTag Tag)
+{
+	CharacterStateTags.AddTag(Tag);
+}
+
+void AFFCharacter::RemoveStateTag(FGameplayTag Tag)
+{
+	CharacterStateTags.RemoveTag(Tag);
+}
+
+bool AFFCharacter::HasStateTag(FGameplayTag Tag) const
+{
+	return CharacterStateTags.HasTag(Tag);
+}
+
+void AFFCharacter::GetOwnedGameplayTags(FGameplayTagContainer& TagContainer) const
+{
+	TagContainer = CharacterStateTags;
 }

@@ -40,6 +40,11 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "HitReaction")
 	void MeleeHitReaction(const FVector& HitLocation, const FVector& HitDirection);
+
+	void OnHitReactionEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	void ApplyHitStagger();
+	void EndHitStagger();
 protected:
 	virtual void BeginPlay() override;
 
@@ -62,6 +67,7 @@ private:
 	float CurrentBlendWeight = 1.f;
 
 	FTimerHandle PATriggerTimerHandle;
+	FTimerHandle HitStaggerTimerHandle;
 
 	UPROPERTY(EditAnywhere, Category = "Hurtbox|Config")
 	float BlendInterpSpeed = 10.f;
@@ -71,6 +77,10 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Hurtbox|HitReaction")
 	TMap<EMeleeDirection, UAnimMontage*> HitReactionMontages;
+
+	/** 몽타주 없을 때 경직 지속 시간 */
+	UPROPERTY(EditAnywhere, Category = "Hurtbox|HitReaction")
+	float HitStaggerDuration = 0.5f;
 
 	EMeleeDirection GetHitDirection(const FVector& HitDirection) const;
 };

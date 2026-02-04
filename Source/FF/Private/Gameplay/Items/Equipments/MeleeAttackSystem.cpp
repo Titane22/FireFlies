@@ -105,6 +105,12 @@ void UMeleeAttackSystem::PlayCurrentAttack()
 
 void UMeleeAttackSystem::ExecuteQueuedAttack()
 {
+	if (!CanAttack())
+	{
+		ResetCombo();
+		return;
+	}
+
 	bAttackQueued = false;
 	bCanCombo = false;
 	bIsExecutingQueued = true;

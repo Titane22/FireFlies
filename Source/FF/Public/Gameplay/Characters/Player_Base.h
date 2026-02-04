@@ -86,6 +86,9 @@ protected:
 	void Interact();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void CloseInventory(UAnimInstance* AnimInst);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void Inventory();
 
 	UFUNCTION()

@@ -40,7 +40,8 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Inventory")
 	void LootingInteract(UInventorySystem* ToLootContainerInventory);
-	
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool IsVisibleWidget() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")

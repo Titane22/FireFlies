@@ -2,6 +2,10 @@
 
 #include "Gameplay/Components/Hurtbox.h"
 #include "Gameplay/Characters/FFCharacter.h"
+#include "AIController.h"
+#include "BehaviorTree/BlackboardComponent.h"
+#include "GameplayTagContainer.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "PhysicsEngine/PhysicalAnimationComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 
@@ -123,21 +127,80 @@ void UHurtbox::TriggerHitReaction(const FVector& HitLocation, const FVector& Hit
 	PATrigger();
 }
 
+void UHurtbox::ApplyHitStagger()
+{
+	if (!CharacterRef)
+		return;
+
+	const FGameplayTag HitReactTag = FGameplayTag::RequestGameplayTag(FName("State.Disabled.HitReacting"));
+	CharacterRef->AddStateTag(HitReactTag);
+
+	if (UCharacterMovementComponent* MoveComp = CharacterRef->GetCharacterMovement())
+	{
+		MoveComp->DisableMovement();
+	}
+}
+
+void UHurtbox::EndHitStagger()
+{
+	if (!CharacterRef)
+		return;
+
+	const FGameplayTag HitReactTag = FGameplayTag::RequestGameplayTag(FName("State.Disabled.HitReacting"));
+	CharacterRef->RemoveStateTag(HitReactTag);
+
+	if (UCharacterMovementComponent* MoveComp = CharacterRef->GetCharacterMovement())
+	{
+		MoveComp->SetMovementMode(MOVE_Walking);
+	}
+}
+
 void UHurtbox::MeleeHitReaction(const FVector& HitLocation, const FVector& HitDirection)
 {
 	if (!CharacterRef)
 		return;
 
+	ApplyHitStagger();
+
 	EMeleeDirection Dir = GetHitDirection(HitDirection);
-
 	UAnimMontage** FoundMontage = HitReactionMontages.Find(Dir);
-	if (!FoundMontage || !*FoundMontage)
-		return;
 
-	if (UAnimInstance* Anim = CharacterRef->GetMesh()->GetAnimInstance())
+	if (FoundMontage && *FoundMontage)
 	{
-		Anim->Montage_Play(*FoundMontage);
+		if (UAnimInstance* Anim = CharacterRef->GetMesh()->GetAnimInstance())
+		{
+			Anim->Montage_Play(*FoundMontage, 0.5f);
+
+			FOnMontageEnded EndDelegate;
+			EndDelegate.BindUObject(this, &UHurtbox::OnHitReactionEnded);
+			Anim->Montage_SetEndDelegate(EndDelegate, *FoundMontage);
+		}
 	}
+	else
+	{
+		// 몽타주 없음 - 타이머로 경직 해제
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(HitStaggerTimerHandle);
+			World->GetTimerManager().SetTimer(
+				HitStaggerTimerHandle,
+				this,
+				&UHurtbox::EndHitStagger,
+				HitStaggerDuration,
+				false
+			);
+		}
+		else
+		{
+			// World 없음 - 즉시 해제
+			EndHitStagger();
+		}
+	}
+}
+
+void UHurtbox::OnHitReactionEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	EndHitStagger();
 }
 
 EMeleeDirection UHurtbox::GetHitDirection(const FVector& HitDirection) const
