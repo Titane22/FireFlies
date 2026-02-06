@@ -1,6 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Gameplay/Items/Interaction/Interaction.h"
+
+#include "Components/WidgetComponent.h"
 #include "Gameplay/Data/InteractionData.h"
 
 AInteraction::AInteraction()
@@ -13,6 +15,9 @@ AInteraction::AInteraction()
 	// BaseMesh를 RootComponent로 설정
 	DefaultSceneRoot = CreateDefaultSubobject<USceneComponent>(FName("DefaultSceneRoot"));
 	RootComponent = DefaultSceneRoot;
+
+	InteractionWidget = CreateDefaultSubobject<UWidgetComponent>(FName("InteractionWidget"));
+	InteractionWidget->SetupAttachment(DefaultSceneRoot);
 }
 
 void AInteraction::BeginPlay()

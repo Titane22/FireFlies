@@ -38,10 +38,13 @@ void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputC
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlayer_Base::OnAttackHeld);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &APlayer_Base::OnAttackReleased);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Canceled, this, &APlayer_Base::OnAttackReleased);
+
 		EnhancedInputComponent->BindAction(InventoryAction, ETriggerEvent::Triggered, this, &APlayer_Base::Inventory);
+		EnhancedInputComponent->BindAction(FlashOnAction, ETriggerEvent::Triggered, this, &AFFCharacter::FlashOnOff);
 
 		// Interact actions - Hold support
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &APlayer_Base::Interact_Started);
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &APlayer_Base::Interact_Completed);
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, this, &APlayer_Base::Interact_Completed);
 	}
 }

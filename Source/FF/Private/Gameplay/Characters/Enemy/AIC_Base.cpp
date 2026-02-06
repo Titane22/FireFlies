@@ -86,8 +86,8 @@ void AAIC_Base::SetStateAsAttacking(AActor* ToSetAttackTarget, bool bUseLastKnow
 		AIState = EAIState::Attacking;
 		BB->SetValueAsEnum(StateKeyName, static_cast<uint8>(EAIState::Attacking));
 		BB->SetValueAsObject(AttackTargetKeyName, NewAttackTarget);
-		GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow,
-			FString::Printf(TEXT("ToSetAttackTarget: %s"), *NewAttackTarget->GetName()));
+		// GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow,
+		// 	FString::Printf(TEXT("ToSetAttackTarget: %s"), *NewAttackTarget->GetName()));
 
 		AttackTarget = NewAttackTarget;
 	}

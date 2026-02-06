@@ -280,7 +280,7 @@ void UMeleeAttackSystem::CheckTarget()
 	}
 	if (TargetActor)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, TEXT("SetComponentTickEnabled(true)"));
+		//GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Yellow, TEXT("SetComponentTickEnabled(true)"));
 		SetComponentTickEnabled(true);
 	}
 }
