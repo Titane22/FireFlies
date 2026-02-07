@@ -122,6 +122,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|Properties", meta = (ClampMin = "0.0"))
 	float Weight;
 
+	UPROPERTY(BlueprintReadWrite, Category = "Item|Properties")
+	bool bIsRevealed = true;
+	
 	//==============================================================================
 	// Utility Functions
 	//==============================================================================

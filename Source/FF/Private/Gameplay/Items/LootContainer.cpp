@@ -7,7 +7,6 @@
 
 ALootContainer::ALootContainer()
 {
-
 	InventorySystem = CreateDefaultSubobject<UInventorySystem>("InventorySystem");
 	LootingSystem = CreateDefaultSubobject<ULootingSystem>("LootingSystem");
 }

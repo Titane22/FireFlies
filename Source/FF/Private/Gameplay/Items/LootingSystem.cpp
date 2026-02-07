@@ -74,7 +74,6 @@ void ULootingSystem::GenerateLoot()
 
 		// PrimaryAssetId로 ItemData 로드
 		UItemData* LoadedItemData = Cast<UItemData>(AssetManager.GetPrimaryAssetObject(Selected->ItemID));
-
 		if (!LoadedItemData)
 		{
 			// 동기 로드 시도
@@ -88,6 +87,8 @@ void ULootingSystem::GenerateLoot()
 				*Selected->ItemID.ToString());
 			continue;
 		}
+
+		LoadedItemData->bIsRevealed = false;
 
 		// 수량 결정
 		int32 Quantity = FMath::RandRange(Selected->MinQuantity, Selected->MaxQuantity);
