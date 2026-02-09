@@ -14,6 +14,8 @@
 #include "Presentations/HUD/PlayerHUD.h"
 #include "Presentations/HUD/W_MasterHUD.h"
 #include "GameplayTagContainer.h"
+#include "Gameplay/Data/ConsumableData.h"
+#include "Gameplay/Components/HealthSystem.h"
 
 void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
@@ -54,6 +56,11 @@ void APlayer_Base::BeginPlay()
 	Super::BeginPlay();
 
 	FlashlightChild->SetVisibility(false);
+
+	if (InventorySystem)
+	{
+		InventorySystem->OnConsumableUsed.AddDynamic(this, &APlayer_Base::HandleConsumableUsed);
+	}
 }
 
 void APlayer_Base::SwitchWeapon(EEquipmentSlot Slot)
@@ -631,4 +638,18 @@ void APlayer_Base::OnCloseMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 	FGameplayTag InventoryModeTag = FGameplayTag::RequestGameplayTag(FName("EnhancedInput.Modes.Inventory"));
 	PC->RemoveInputModeTag(InventoryModeTag);
 	PC->SetIgnoreInput(false);
+}
+
+void APlayer_Base::HandleConsumableUsed(UConsumableData* ConsumableData, const FItemSlot& Slot)
+{
+	switch (ConsumableData->EffectType)
+	{
+	case EConsumableEffect::Hunger:
+		break;
+	case EConsumableEffect::Heal:
+		HealthComponent->Heal(ConsumableData->EffectValue);
+		break;
+	case EConsumableEffect::Thirst:
+		break;
+	}
 }

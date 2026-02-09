@@ -6,6 +6,7 @@
 #include "Gameplay/Characters/FFCharacter.h"
 #include "Player_Base.generated.h"
 
+class UConsumableData;
 class APC_Base;
 class AMasterWeapon;
 class UInputAction;
@@ -99,6 +100,9 @@ protected:
 
 	UFUNCTION()
 	void OnCloseMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	UFUNCTION()
+	void HandleConsumableUsed(UConsumableData* ConsumableData, const FItemSlot& Slot);
 private:
 	bool bInteractHoldTriggered = false;
 	float InteractStartTime = 0.0f;

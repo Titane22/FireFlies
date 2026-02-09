@@ -8,9 +8,11 @@
 #include "Gameplay/Data/InventoryTypes.h"
 #include "InventorySystem.generated.h"
 
+class UConsumableData;
 // 아이템 추가/제거 시 브로드캐스트 (FItemSlot 전체 정보 전달)
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemAdded, const FItemSlot&, AddedItem);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemRemoved, const FItemSlot&, RemovedItem);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnConsumableUsed, UConsumableData*, ConsumableData, const FItemSlot&, RemovedItem);
 
 class UMagazineData;
 
@@ -136,6 +138,12 @@ public:
 	UItemData* ConsumeArrow(FGameplayTag RequiredArrowTag);
 
 	//==============================================================================
+	// Consumable
+	//==============================================================================
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Consumable")
+	bool UseConsumable(FGuid InstanceID);
+	
+	//==============================================================================
 	// Delegates
 	//==============================================================================
 
@@ -147,6 +155,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Events")
 	FOnItemRemoved OnItemRemoved;
 
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Events")
+	FOnConsumableUsed OnConsumableUsed;
+	
 protected:
 	//==============================================================================
 	// Grid Configuration

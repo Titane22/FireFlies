@@ -1,6 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Gameplay/Items/InventorySystem.h"
+
+#include "Gameplay/Data/ConsumableData.h"
 #include "Gameplay/Data/ItemData.h"
 #include "Gameplay/Data/MagazineData.h"
 
@@ -78,7 +80,7 @@ bool UInventorySystem::AddItem(UItemData* ItemData, int32 GridRow, int32 GridCol
 		UE_LOG(LogTemp, Warning, TEXT("[InventorySystem] AddItem failed: Weight limit exceeded"));
 		return false;
 	}
-
+	
 	// Create new item slot
 	FItemSlot NewSlot(ItemData, Quantity);
 	NewSlot.GridRow = GridRow;
@@ -565,4 +567,25 @@ UItemData* UInventorySystem::ConsumeArrow(FGameplayTag RequiredArrowTag)
 	}
 
 	return ArrowItemData;
+}
+
+bool UInventorySystem::UseConsumable(FGuid InstanceID)
+{
+	FItemSlot* Slot = FindItem(InstanceID);
+	if (!Slot || Slot->IsEmpty())
+		return false;
+
+	UConsumableData* ConsumableData = Cast<UConsumableData>(Slot->GetItemData());
+	if (!ConsumableData)
+		return false;
+
+	OnConsumableUsed.Broadcast(ConsumableData, *Slot);
+	Slot->Quantity -= 1;
+
+	if (Slot->Quantity <= 0)
+		RemoveItem(InstanceID);
+	else
+		RecalculateWeight();
+
+	return true;
 }
