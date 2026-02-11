@@ -83,6 +83,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ballistics")
 	float MaxRange;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ballistics")
+	int32 PelletsPerShot = 1;
+
+	// 거리별 데미지 감소 커브 (X=거리, Y=데미지 배율 0~1)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ballistics")
+	UCurveFloat* DamageFalloffCurve;
+
+	/** DamageFalloffCurve를 사용하여 거리에 따른 최종 데미지를 계산 (커브 미설정 시 BaseDamage 그대로 반환) */
+	float GetDamageAtDistance(float BaseDamage, float Distance) const;
+	
 	// UI
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
 	UTexture2D* WeaponUITexture;

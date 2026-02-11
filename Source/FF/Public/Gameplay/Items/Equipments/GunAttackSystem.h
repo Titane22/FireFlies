@@ -67,6 +67,21 @@ private:
 	bool PerformCameraTrace(APlayerCameraManager* CameraManager, FHitResult& OutHitResult);
 	void ExecuteFireSequence(const FHitResult& CameraHitResult);
 
+	// 스프레드가 적용된 타겟 포인트 계산 (Hitscan/Projectile 공통)
+	FVector ApplySpreadToTarget(const FVector& BaseTarget, APlayerCameraManager* PCM);
+
+	// Hitscan 전용: 스프레드 적용된 라인 트레이스 + 즉시 데미지
+	void PerformHitscanFire();
+
+	// Hitscan 전용: 스프레드 적용된 단일 라인 트레이스
+	bool PerformSpreadTrace(FHitResult& OutHitResult, FVector& OutTraceEnd);
+
+	// 시각 전용 궤적 스폰 (Hitscan에서 사용, 데미지 없음)
+	void SpawnVisualTracer(const FVector& Start, const FVector& End);
+
+	// 히트 마커 사운드 + HUD 피드백 재생
+	void PlayHitFeedback(bool bIsKill);
+
 	// 발사 상태 (Player_Base에서 이동)
 	void HandleFiring();
 	void ReadyToFire();
@@ -80,4 +95,7 @@ public:
 	/** 총알 궤적 Actor의 최대 생존 시간 (초) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|BulletTrace")
 	float BulletTraceLifeSpan = 3.0f;
+
+private:
+	int32 BurstShotsFired = 0;
 };

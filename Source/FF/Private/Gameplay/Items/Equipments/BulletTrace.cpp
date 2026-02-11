@@ -7,6 +7,10 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "NiagaraComponent.h"
 #include "Gameplay/Interfaces/Damageable.h"
+#include "Gameplay/Items/Equipments/MasterWeapon.h"
+#include "Gameplay/Data/WeaponData.h"
+#include "Presentations/HUD/PlayerHUD.h"
+#include "Kismet/GameplayStatics.h"
 
 ABulletTrace::ABulletTrace()
 {
@@ -113,24 +117,57 @@ void ABulletTrace::ProcessHit(AActor* HitActor, const FHitResult& HitResult)
 		HitComponent->AddImpulseAtLocation(ImpulseDir * ImpactForce, HitResult.ImpactPoint);
 	}
 
+	// 거리별 데미지 감소 적용
+	float FinalDamage = BaseDamage;
+	AMasterWeapon* OwnerWeapon = Cast<AMasterWeapon>(GetOwner());
+	APawn* InstigatorPawn = GetInstigator();
+	if (OwnerWeapon && OwnerWeapon->WeaponData)
+	{
+		float Distance = InstigatorPawn
+			? FVector::Dist(InstigatorPawn->GetActorLocation(), HitResult.ImpactPoint)
+			: 0.f;
+		FinalDamage = OwnerWeapon->WeaponData->GetDamageAtDistance(BaseDamage, Distance);
+	}
+
 	// 데미지 적용
 	FVector ShotDirection = GetVelocity().GetSafeNormal();
 	FPointDamageEvent DamageEvent(
-		BaseDamage,
+		FinalDamage,
 		HitResult,
 		ShotDirection,
 		nullptr
 	);
 
-	APawn* InstigatorPawn = GetInstigator();
 	AController* InstigatorCtrl = InstigatorPawn ? InstigatorPawn->GetController() : nullptr;
 
 	IDamageable::Execute_TakeDamage(
 		HitActor,
-		BaseDamage,
+		FinalDamage,
 		DamageEvent,
 		HitResult.BoneName,
 		InstigatorCtrl,
 		GetOwner()
 	);
+
+	// Projectile 개별 히트 피드백
+	bool bIsDead = IDamageable::Execute_IsDead(HitActor);
+	UWeaponData* WeaponData = OwnerWeapon ? OwnerWeapon->WeaponData : nullptr;
+	if (WeaponData)
+	{
+		USoundBase* Sound = bIsDead ? WeaponData->KillSound : WeaponData->HitMarkerSound;
+		if (Sound)
+			UGameplayStatics::PlaySound2D(this, Sound);
+	}
+
+	// HUD 히트 마커 표시
+	if (InstigatorPawn)
+	{
+		APlayerController* PC = Cast<APlayerController>(InstigatorPawn->GetController());
+		if (PC)
+		{
+			APlayerHUD* HUD = Cast<APlayerHUD>(PC->GetHUD());
+			if (HUD)
+				HUD->ShowHitMarker(bIsDead);
+		}
+	}
 }

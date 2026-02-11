@@ -68,6 +68,14 @@ public:
 	void SetWeaponDataOnHUD(UTexture2D* Texture, const FString& WeaponName, int32 MaxAmmo, int32 CurrentClip);
 
 	//==========================================================================
+	// Hit Marker
+	//==========================================================================
+
+	/** Show hit marker on HUD (pass-through to MasterHUD) */
+	UFUNCTION(BlueprintCallable, Category = "HUD|HitMarker")
+	void ShowHitMarker(bool bIsKill);
+
+	//==========================================================================
 	// Interaction Functions (Interacting State)
 	//==========================================================================
 

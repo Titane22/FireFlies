@@ -86,23 +86,6 @@ bool UWeaponAttackSystem::ApplyHit(const FHitResult HitResult, float DamageAmoun
 			GetOwner()
 		);
 		ValidHit = ActualDamage > 0.0f;
-		// TODO: 호출시 사용
-		// if (ValidHit)
-		// {
-		// 	if (WeaponData && WeaponData->HitMarkerSound)
-		// 	{
-		// 		UGameplayStatics::PlaySound2D(
-		// 			this,                       // WorldContextObject
-		// 			WeaponData->HitMarkerSound, // Sound
-		// 			1.0f,                       // Volume Multiplier
-		// 			1.0f,                       // Pitch Multiplier
-		// 			0.0f,                       // Start Time
-		// 			nullptr,                    // Concurrency Settings
-		// 			nullptr,                    // Owning Actor
-		// 			true                        // Is UI Sound
-		// 		);
-		// 	}
-		// }
 		bIsDead = IDamageable::Execute_IsDead(HitActor);
 	}
     

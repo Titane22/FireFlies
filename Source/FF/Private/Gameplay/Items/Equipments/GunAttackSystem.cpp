@@ -96,6 +96,27 @@ void UGunAttackSystem::ReadyToFire()
 
 	switch (CurrentFireMode)
 	{
+	case EFireMode::Burst:
+		GetWorld()->GetTimerManager().SetTimer(
+			FireRateTimerHandle,
+			[this]()
+			{
+				BurstShotsFired++;
+				if (BurstShotsFired < OwnerWeapon->WeaponData->BurstAmount)
+				{
+					bCanFire = true;
+					ReadyToFire();
+				}
+				else
+				{
+					BurstShotsFired = 0;
+					bCanFire = true;
+				}
+			},
+			FireDelay,
+			false
+		);
+		break;
 	case EFireMode::FullAuto:
 		// 타이머 콜백에서 bFiring을 체크하지 않음
 		// OnAttackReleased에서 타이머를 직접 Clear하여 연사 중지
@@ -202,21 +223,31 @@ void UGunAttackSystem::PerformAttack()
 
 	UE_LOG(LogTemp, Log, TEXT("[Fire] PlayerController found"));
 
-	// Apply camera shake (only for players)
-	ApplyCameraShake(PC);
-
-	// Perform camera trace
-	FHitResult CameraHitResult;
-	if (PerformCameraTrace(PC->PlayerCameraManager, CameraHitResult))
+	// Branch based on attack type
+	switch (OwnerWeapon->WeaponData->AttackType)
 	{
-		// Hit something - fire at target
-		ExecuteFireSequence(CameraHitResult);
-	}
-	else
-	{
-		// Didn't hit anything - fire blank tracer
+	case EWeaponAttackType::Hitscan:
+		ApplyCameraShake(PC);
 		PlayFireEffect();
-		FireBlankTracer();
+		PerformHitscanFire();
+		break;
+
+	case EWeaponAttackType::Projectile:
+	default:
+	{
+		ApplyCameraShake(PC);
+		FHitResult CameraHitResult;
+		if (PerformCameraTrace(PC->PlayerCameraManager, CameraHitResult))
+		{
+			ExecuteFireSequence(CameraHitResult);
+		}
+		else
+		{
+			PlayFireEffect();
+			FireBlankTracer();
+		}
+		break;
+	}
 	}
 }
 
@@ -254,23 +285,36 @@ void UGunAttackSystem::SetCurrentAmmo(float Amount)
 	OwnerWeapon->CurrentMagazine->CurrentAmmo = static_cast<int32>(Amount);
 }
 
+FVector UGunAttackSystem::ApplySpreadToTarget(const FVector& BaseTarget, APlayerCameraManager* PCM)
+{
+	if (!PCM || !OwnerWeapon || !OwnerWeapon->WeaponData)
+		return BaseTarget;
+
+	FVector CameraLocation = PCM->GetCameraLocation();
+	float Distance = FVector::Dist(CameraLocation, BaseTarget);
+	float SpreadRadius = FMath::Tan(FMath::DegreesToRadians(OwnerWeapon->WeaponData->BulletSpread)) * Distance;
+
+	float PointX, PointY;
+	RandPointInCircle(SpreadRadius, PointX, PointY);
+
+	return BaseTarget + PCM->GetActorRightVector() * PointX + PCM->GetActorUpVector() * PointY;
+}
+
 void UGunAttackSystem::FireBullet(FHitResult Hit, bool bReturnHit)
 {
     if (!CharacterRef || !OwnerWeapon->WeaponData)
         return;
 
-    for (int32 curBurst = 0; curBurst < OwnerWeapon->WeaponData->BurstAmount; curBurst++)
+    APlayerCameraManager* CameraManager = GetWorld()->GetFirstPlayerController()->PlayerCameraManager;
+    if (!CameraManager)
+        return;
+
+    FVector MuzzleLocation = OwnerWeapon->EquipmentMesh->GetSocketLocation(FName("Muzzle"));
+
+    for (int32 i = 0; i < OwnerWeapon->WeaponData->PelletsPerShot; i++)
     {
-        float PointX, PointY;
-        RandPointInCircle(FMath::Tan(OwnerWeapon->WeaponData->BulletSpread) * 10.0f, PointX, PointY);
-
-        APlayerCameraManager* CameraManager = GetWorld()->GetFirstPlayerController()->PlayerCameraManager;
-        if (!CameraManager)
-            return;
-
-        FVector SpreadAdjustedHitLocation = Hit.Location + CameraManager->GetActorRightVector() * PointX + CameraManager->GetActorUpVector() * PointY;
-        FVector MuzzleLocation = OwnerWeapon->EquipmentMesh->GetSocketLocation(FName("Muzzle"));
-        FVector BulletDirection = (SpreadAdjustedHitLocation - MuzzleLocation).GetSafeNormal();
+        FVector SpreadTarget = ApplySpreadToTarget(Hit.Location, CameraManager);
+        FVector BulletDirection = (SpreadTarget - MuzzleLocation).GetSafeNormal();
 
         // BulletTrace 스폰 - 충돌 시 데미지는 BulletTrace::ProcessHit에서 처리
         if (OwnerWeapon->WeaponData->BulletTraceClass)
@@ -385,7 +429,7 @@ void UGunAttackSystem::FireBlankTracer()
 {
 	if (!OwnerWeapon->WeaponData || !OwnerWeapon->WeaponData->BulletTraceClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("MasterWeapon::FireBlankTracer - WeaponData or BulletTraceClass is NULL"));
+		UE_LOG(LogTemp, Warning, TEXT("GunAttackSystem::FireBlankTracer - WeaponData or BulletTraceClass is NULL"));
 		return;
 	}
 
@@ -393,27 +437,30 @@ void UGunAttackSystem::FireBlankTracer()
 	if (!PC || !PC->PlayerCameraManager)
 		return;
 
-	// Apply camera shake (only for players)
-	ApplyCameraShake(PC);
+	APlayerCameraManager* PCM = PC->PlayerCameraManager;
+	FVector MuzzleLocation = OwnerWeapon->EquipmentMesh->GetSocketLocation(FName("Muzzle"));
+	FVector CameraLocation = PCM->GetCameraLocation();
+	FVector BaseEnd = CameraLocation + PCM->GetActorForwardVector() * OwnerWeapon->WeaponData->MaxRange;
 
-	FVector SocketLocation = OwnerWeapon->EquipmentMesh->GetSocketLocation(FName("Muzzle"));
-	FVector TraceEndLocation = PC->PlayerCameraManager->GetRootComponent()->GetComponentLocation()
-		+ PC->PlayerCameraManager->GetActorForwardVector() * 20000.0f;
-	FVector DirectionVector = TraceEndLocation - SocketLocation;
-	FRotator Rotation = UKismetMathLibrary::MakeRotFromX(DirectionVector);
-
-	FTransform NewTransform(Rotation, SocketLocation, FVector(1.0f));
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = OwnerWeapon;
-	SpawnParams.Instigator = CharacterRef;
-
-	ABulletTrace* SpawnedBullet = GetWorld()->SpawnActor<ABulletTrace>(
-		OwnerWeapon->WeaponData->BulletTraceClass, NewTransform, SpawnParams);
-	if (SpawnedBullet)
+	for (int32 i = 0; i < OwnerWeapon->WeaponData->PelletsPerShot; i++)
 	{
-		SpawnedBullet->SetLifeSpan(BulletTraceLifeSpan);
-		SpawnedBullet->BaseDamage = OwnerWeapon->WeaponData->Damage;
+		FVector SpreadTarget = ApplySpreadToTarget(BaseEnd, PCM);
+		FVector DirectionVector = SpreadTarget - MuzzleLocation;
+		FRotator Rotation = UKismetMathLibrary::MakeRotFromX(DirectionVector);
+
+		FTransform NewTransform(Rotation, MuzzleLocation, FVector(1.0f));
+
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = OwnerWeapon;
+		SpawnParams.Instigator = CharacterRef;
+
+		ABulletTrace* SpawnedBullet = GetWorld()->SpawnActor<ABulletTrace>(
+			OwnerWeapon->WeaponData->BulletTraceClass, NewTransform, SpawnParams);
+		if (SpawnedBullet)
+		{
+			SpawnedBullet->SetLifeSpan(BulletTraceLifeSpan);
+			SpawnedBullet->BaseDamage = OwnerWeapon->WeaponData->Damage;
+		}
 	}
 }
 
@@ -604,4 +651,142 @@ void UGunAttackSystem::ExecuteFireSequence(const FHitResult& CameraHitResult)
 {
     PlayFireEffect();
     FireBullet(CameraHitResult, false);
+}
+
+void UGunAttackSystem::PerformHitscanFire()
+{
+	if (!OwnerWeapon || !OwnerWeapon->WeaponData)
+		return;
+
+	const int32 NumPellets = OwnerWeapon->WeaponData->PelletsPerShot;
+	FVector MuzzleLocation = OwnerWeapon->EquipmentMesh->GetSocketLocation(FName("Muzzle"));
+
+	bool bAnyValidHit = false;
+	bool bAnyKill = false;
+
+	for (int32 i = 0; i < NumPellets; i++)
+	{
+		FHitResult HitResult;
+		FVector TraceEnd;
+
+		bool bHit = PerformSpreadTrace(HitResult, TraceEnd);
+
+		if (bHit)
+		{
+			AActor* HitActor = HitResult.GetActor();
+			float Distance = FVector::Dist(HitResult.TraceStart, HitResult.ImpactPoint);
+			float AdjustedDamage = OwnerWeapon->WeaponData->GetDamageAtDistance(
+				OwnerWeapon->WeaponData->Damage, Distance);
+
+			// UE_LOG(LogTemp, Warning, TEXT("[Hitscan] Hit: %s | Damageable: %d | Dist: %.0f | BaseDmg: %.1f | AdjDmg: %.1f"),
+			// 	HitActor ? *HitActor->GetName() : TEXT("NULL"),
+			// 	HitActor ? HitActor->Implements<UDamageable>() : 0,
+			// 	Distance,
+			// 	OwnerWeapon->WeaponData->Damage,
+			// 	AdjustedDamage);
+
+			bool bValidHit = false;
+			bool bKilled = ApplyHit(HitResult, AdjustedDamage, bValidHit);
+
+			bAnyValidHit |= bValidHit;
+			bAnyKill |= bKilled;
+		}
+
+		SpawnVisualTracer(MuzzleLocation, bHit ? HitResult.ImpactPoint : TraceEnd);
+	}
+
+	// 모든 펠릿 처리 후 피드백 한 번만 재생 (킬 우선)
+	if (bAnyValidHit || bAnyKill)
+	{
+		PlayHitFeedback(bAnyKill);
+	}
+}
+
+bool UGunAttackSystem::PerformSpreadTrace(FHitResult& OutHitResult, FVector& OutTraceEnd)
+{
+	APlayer_Base* Player = Cast<APlayer_Base>(CharacterRef);
+	if (!Player)
+		return false;
+
+	APlayerCameraManager* PCM = Player->GetPlayerCameraManager();
+	if (!PCM || !OwnerWeapon->WeaponData)
+		return false;
+
+	FVector StartLocation = PCM->GetCameraLocation();
+	FVector BaseEnd = StartLocation + PCM->GetActorForwardVector() * OwnerWeapon->WeaponData->MaxRange;
+
+	OutTraceEnd = ApplySpreadToTarget(BaseEnd, PCM);
+
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(OwnerWeapon);
+	QueryParams.AddIgnoredActor(CharacterRef);
+
+	// DrawDebugLine(
+	//     GetWorld(),           // 월드
+	//     StartLocation,        // 시작점
+	//     OutTraceEnd,          // 끝점
+	//     FColor::Green,       // 라인 색상
+	//     false,               // 지속적으로 그릴지 여부
+	//     5.0f,                // 지속 시간 (초)
+	//     0,                   // 우선순위
+	//     2.0f                 // 두께
+	// );
+	
+	return GetWorld()->LineTraceSingleByChannel(
+		OutHitResult,
+		StartLocation,
+		OutTraceEnd,
+		ECollisionChannel::ECC_Visibility,
+		QueryParams
+	);
+}
+
+void UGunAttackSystem::SpawnVisualTracer(const FVector& Start, const FVector& End)
+{
+	if (!OwnerWeapon || !OwnerWeapon->WeaponData || !OwnerWeapon->WeaponData->BulletTraceClass)
+		return;
+
+	FVector Direction = (End - Start).GetSafeNormal();
+	FRotator Rotation = Direction.Rotation();
+
+	FTransform SpawnTransform;
+	SpawnTransform.SetLocation(Start);
+	SpawnTransform.SetRotation(Rotation.Quaternion());
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = OwnerWeapon;
+	SpawnParams.Instigator = CharacterRef;
+
+	ABulletTrace* SpawnedTracer = GetWorld()->SpawnActor<ABulletTrace>(
+		OwnerWeapon->WeaponData->BulletTraceClass, SpawnTransform, SpawnParams);
+	if (SpawnedTracer)
+	{
+		SpawnedTracer->SetLifeSpan(BulletTraceLifeSpan);
+		// Hitscan 전용: 데미지는 라인 트레이스에서 이미 처리됨
+		SpawnedTracer->BaseDamage = 0.f;
+	}
+}
+
+void UGunAttackSystem::PlayHitFeedback(bool bIsKill)
+{
+	if (!OwnerWeapon || !OwnerWeapon->WeaponData)
+		return;
+
+	// 히트/킬 사운드 재생
+	USoundBase* Sound = bIsKill
+		? OwnerWeapon->WeaponData->KillSound
+		: OwnerWeapon->WeaponData->HitMarkerSound;
+	if (Sound)
+		UGameplayStatics::PlaySound2D(this, Sound);
+
+	// HUD 히트 마커 표시
+	APlayer_Base* Player = Cast<APlayer_Base>(CharacterRef);
+	if (!Player)
+		return;
+	APlayerController* PC = Cast<APlayerController>(Player->GetController());
+	if (!PC)
+		return;
+	APlayerHUD* HUD = Cast<APlayerHUD>(PC->GetHUD());
+	if (HUD)
+		HUD->ShowHitMarker(bIsKill);
 }

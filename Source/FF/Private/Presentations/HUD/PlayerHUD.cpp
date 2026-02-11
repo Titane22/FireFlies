@@ -141,6 +141,18 @@ void APlayerHUD::SetWeaponDataOnHUD(UTexture2D* Texture, const FString& WeaponNa
 }
 
 //==============================================================================
+// Hit Marker
+//==============================================================================
+
+void APlayerHUD::ShowHitMarker(bool bIsKill)
+{
+	if (MasterHUD)
+	{
+		MasterHUD->ShowHitMarker(bIsKill);
+	}
+}
+
+//==============================================================================
 // Interaction Functions
 //==============================================================================
 

@@ -87,6 +87,14 @@ public:
 	void SetCrosshairVisible(bool bVisible);
 
 	//==========================================================================
+	// Hit Marker
+	//==========================================================================
+
+	/** Show hit marker feedback (white flash for hit, red for kill) - implement in Blueprint */
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "HUD|HitMarker")
+	void ShowHitMarker(bool bIsKill);
+
+	//==========================================================================
 	// Interaction Panel (Interacting State)
 	//==========================================================================
 
