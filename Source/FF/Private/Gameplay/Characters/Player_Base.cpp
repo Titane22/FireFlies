@@ -153,10 +153,9 @@ bool APlayer_Base::CanSwitchWeapon()
 
 void APlayer_Base::OpenLootingUI(UInventorySystem* ContainerInven)
 {
-	if (APC_Base* PC_Base = Cast<APC_Base>(GetController()))
-	{
-		PC_Base->LootingInteract(ContainerInven);
-	}
+	PendingLootContainer = ContainerInven;
+	OpenUIWithContext(EInventoryUIContext::Looting);
+	// LootingInteract는 OpenMontage 종료 후 OnOpenMontageEnded에서 호출됨
 }
 
 void APlayer_Base::UpdateWeaponUI(UWeaponData* WeaponData)
@@ -583,20 +582,52 @@ void APlayer_Base::Interact()
 	Interact_Completed();
 }
 
+void APlayer_Base::OpenUIWithContext(EInventoryUIContext Context)
+{
+	APC_Base* PC = Cast<APC_Base>(GetController());
+	if (!PC)
+		return;
+
+	const FInventoryAnimSet* AnimSet = InventoryAnimSets.Find(Context);
+	if (!AnimSet || !AnimSet->OpenMontage || !AnimSet->CloseMontage)
+		return;
+
+	UAnimInstance* AnimInst = GetMesh()->GetAnimInstance();
+	if (!AnimInst)
+		return;
+
+	CurrentUIContext = Context;
+
+	AnimInst->Montage_Play(AnimSet->OpenMontage, 0.75f);
+
+	FGameplayTag InventoryModeTag = FGameplayTag::RequestGameplayTag(FName("EnhancedInput.Modes.Inventory"));
+	PC->AddInputModeTag(InventoryModeTag);
+	PC->SetIgnoreInput(true);
+
+	FOnMontageEnded OpenDelegate;
+	OpenDelegate.BindUObject(this, &APlayer_Base::OnOpenMontageEnded);
+	AnimInst->Montage_SetEndDelegate(OpenDelegate, AnimSet->OpenMontage);
+}
+
 void APlayer_Base::CloseInventory(UAnimInstance* AnimInst)
 {
-	AnimInst->Montage_Play(CloseInventoryAnimMontage, 0.75f);
+	const FInventoryAnimSet* AnimSet = InventoryAnimSets.Find(CurrentUIContext);
+	if (!AnimSet || !AnimSet->CloseMontage)
+		return;
 
-	FOnMontageEnded CompleteDelegate;
-	CompleteDelegate.BindUObject(this, &APlayer_Base::OnCloseMontageEnded);
-	AnimInst->Montage_SetEndDelegate(CompleteDelegate, CloseInventoryAnimMontage);
+	AnimInst->Montage_Play(AnimSet->CloseMontage, 0.75f);
+
+	FOnMontageEnded CloseDelegate;
+	CloseDelegate.BindUObject(this, &APlayer_Base::OnCloseMontageEnded);
+	AnimInst->Montage_SetEndDelegate(CloseDelegate, AnimSet->CloseMontage);
 }
 
 void APlayer_Base::Inventory()
 {
 	APC_Base* PC = Cast<APC_Base>(GetController());
-	if (!PC || !OpenInventoryAnimMontage || !CloseInventoryAnimMontage)
+	if (!PC)
 		return;
+
 	if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
 	{
 		if (PC->IsVisibleWidget())
@@ -605,26 +636,25 @@ void APlayer_Base::Inventory()
 		}
 		else
 		{
-			AnimInst->Montage_Play(OpenInventoryAnimMontage, 0.75f);
-			
-			// Activate Inventory Input Mode
-			FGameplayTag InventoryModeTag = FGameplayTag::RequestGameplayTag(FName("EnhancedInput.Modes.Inventory"));
-			PC->AddInputModeTag(InventoryModeTag);
-			PC->SetIgnoreInput(true);
-			
-			FOnMontageEnded CompleteDelegate;
-			CompleteDelegate.BindUObject(this, &APlayer_Base::OnOpenMontageEnded);
-			AnimInst->Montage_SetEndDelegate(CompleteDelegate, OpenInventoryAnimMontage);
+			OpenUIWithContext(EInventoryUIContext::Inventory);
 		}
 	}
 }
-	
 
 void APlayer_Base::OnOpenMontageEnded(UAnimMontage* Montage, bool bInterrupted)
-{ 
+{
 	if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
 	{
 		AnimInst->Montage_JumpToSection("Idle", Montage);
+	}
+
+	if (CurrentUIContext == EInventoryUIContext::Looting)
+	{
+		if (APC_Base* PC = Cast<APC_Base>(GetController()))
+		{
+			PC->LootingInteract(PendingLootContainer);
+		}
+		PendingLootContainer = nullptr;
 	}
 }
 
@@ -633,11 +663,12 @@ void APlayer_Base::OnCloseMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 	APC_Base* PC = Cast<APC_Base>(GetController());
 	if (!PC)
 		return;
-	
-	// Activate Inventory Input Mode
+
 	FGameplayTag InventoryModeTag = FGameplayTag::RequestGameplayTag(FName("EnhancedInput.Modes.Inventory"));
 	PC->RemoveInputModeTag(InventoryModeTag);
 	PC->SetIgnoreInput(false);
+
+	CurrentUIContext = EInventoryUIContext::None;
 }
 
 void APlayer_Base::HandleConsumableUsed(UConsumableData* ConsumableData, const FItemSlot& Slot)

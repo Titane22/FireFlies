@@ -5,6 +5,18 @@
 #include "InventoryTypes.generated.h"
 
 /**
+ * UI가 어떤 컨텍스트로 열렸는지 추적 — 컨텍스트별 Open/Close 애니메이션 매핑에 사용
+ * 새 UI 타입 추가 시 여기에 값만 추가하면 됨
+ */
+UENUM(BlueprintType)
+enum class EInventoryUIContext : uint8
+{
+	None      UMETA(DisplayName = "None"),
+	Inventory UMETA(DisplayName = "Inventory"),
+	Looting   UMETA(DisplayName = "Looting"),
+};
+
+/**
  * Represents a single item slot in the inventory
  * Holds reference to ItemData and instance-specific properties
  */
