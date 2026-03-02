@@ -18,7 +18,8 @@ class FF_API UMagazineData : public UItemData
 
 public:
 	UMagazineData();
-
+	/** AssetManager용 PrimaryAssetId 반환 */
+	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
 	//==============================================================================
 	// Ammo Type
 	//==============================================================================

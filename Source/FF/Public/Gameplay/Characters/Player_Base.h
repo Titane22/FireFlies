@@ -37,6 +37,8 @@ class FF_API APlayer_Base : public AFFCharacter
 	GENERATED_BODY()
 
 protected:
+	APlayer_Base();
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputMappingContext* DefaultMappingContext;
 
@@ -66,6 +68,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SwitchMeleeAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
+	USkeletalMeshComponent* BackpackSKM;
+	
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
 	UW_MasterHUD* MasterHUD;

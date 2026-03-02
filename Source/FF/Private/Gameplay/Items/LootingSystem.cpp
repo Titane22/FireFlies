@@ -65,7 +65,7 @@ void ULootingSystem::GenerateLoot()
 
 	// 아이템 드롭
 	UAssetManager& AssetManager = UAssetManager::Get();
-
+	float TotalWeight = 0.0f;
 	for (int32 i = 0; i < DropCount; ++i)
 	{
 		const FLootItemRow* Selected = SelectByWeight(ValidEntries);
@@ -87,7 +87,7 @@ void ULootingSystem::GenerateLoot()
 				*Selected->ItemID.ToString());
 			continue;
 		}
-
+		TotalWeight += Selected->Weight;
 		LoadedItemData->bIsRevealed = false;
 
 		// 수량 결정
@@ -99,6 +99,8 @@ void ULootingSystem::GenerateLoot()
 		UE_LOG(LogTemp, Log, TEXT("LootingSystem::GenerateLoot - Added %s x%d"),
 			*LoadedItemData->ItemName.ToString(), Quantity);
 	}
+	UE_LOG(LogTemp, Log, TEXT("LootingSystem::GenerateLoot - Total Weight %lf"),
+			TotalWeight);
 }
 
 const FLootItemRow* ULootingSystem::SelectByWeight(const TArray<const FLootItemRow*>& Entries)

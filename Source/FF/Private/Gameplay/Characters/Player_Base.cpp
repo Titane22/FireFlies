@@ -17,6 +17,14 @@
 #include "Gameplay/Data/ConsumableData.h"
 #include "Gameplay/Components/HealthSystem.h"
 
+APlayer_Base::APlayer_Base()
+	:Super()
+{
+	BackpackSKM = CreateDefaultSubobject<USkeletalMeshComponent>("Backpack Mesh");
+
+	BackpackSKM->SetupAttachment(GetMesh(), "backpack_socket");
+}
+
 void APlayer_Base::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -598,6 +606,11 @@ void APlayer_Base::OpenUIWithContext(EInventoryUIContext Context)
 
 	CurrentUIContext = Context;
 
+	if (Context == EInventoryUIContext::Inventory && BackpackSKM)
+	{
+		BackpackSKM->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, TEXT("interact_backpack"));
+	}
+
 	AnimInst->Montage_Play(AnimSet->OpenMontage, 0.75f);
 
 	FGameplayTag InventoryModeTag = FGameplayTag::RequestGameplayTag(FName("EnhancedInput.Modes.Inventory"));
@@ -667,6 +680,12 @@ void APlayer_Base::OnCloseMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 	FGameplayTag InventoryModeTag = FGameplayTag::RequestGameplayTag(FName("EnhancedInput.Modes.Inventory"));
 	PC->RemoveInputModeTag(InventoryModeTag);
 	PC->SetIgnoreInput(false);
+	PC->CloseInventory();
+
+	if (CurrentUIContext == EInventoryUIContext::Inventory && BackpackSKM)
+	{
+		BackpackSKM->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, TEXT("backpack_socket"));
+	}
 
 	CurrentUIContext = EInventoryUIContext::None;
 }

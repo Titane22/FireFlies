@@ -10,6 +10,11 @@ UMagazineData::UMagazineData()
 	MaxStackSize = 1;
 }
 
+FPrimaryAssetId UMagazineData::GetPrimaryAssetId() const
+{
+	return FPrimaryAssetId("Magazine_C", GetFName());
+}
+
 bool UMagazineData::IsCompatibleWith(FGameplayTag OtherAmmoType) const
 {
 	// 정확히 같은 타입이면 호환
